@@ -1,0 +1,487 @@
+/* Dioxus Flow base styles */
+
+.dioxus-flow {
+    --df-background-color: #ffffff;
+    --df-background-pattern-color: #b1b1b7;
+    --df-node-color: #ffffff;
+    --df-node-border-color: #1a192b;
+    --df-node-border-radius: 6px;
+    --df-handle-color: #555555;
+    --df-handle-border-color: #ffffff;
+    --df-selection-color: rgba(0, 89, 220, 0.08);
+    --df-selection-border-color: #0059dc;
+    --df-edge-color: #b1b1b7;
+    --df-edge-color-selected: #555555;
+    --df-connection-line-color: #222222;
+    --df-attribution-color: #999999;
+    --df-minimap-mask-color: rgba(240, 240, 240, 0.6);
+    --df-minimap-mask-stroke-color: #333333;
+    --df-controls-button-bg: #fefefe;
+    --df-controls-button-bg-hover: #f4f4f4;
+    --df-controls-button-color: #222222;
+    --df-controls-button-border-color: #eee;
+    --df-edge-label-color: #1a192b;
+    --df-edge-label-bg-color: #ffffff;
+    --df-minimap-border-color: #e6e6e6;
+    --df-minimap-node-stroke-color: #1a192b;
+    --df-selection-box-shadow: 0 0 0 1px rgba(0, 89, 220, 0.35);
+
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--df-background-color);
+}
+
+.dioxus-flow.dioxus-flow--dark {
+    --df-background-color: #1e1e1e;
+    --df-background-pattern-color: #4a4a55;
+    --df-node-color: #2a2a2a;
+    --df-node-border-color: #c7c7c7;
+    --df-handle-color: #c7c7c7;
+    --df-handle-border-color: #444444;
+    --df-selection-color: rgba(78, 161, 255, 0.12);
+    --df-selection-border-color: rgba(78, 161, 255, 0.8);
+    --df-edge-color: #c7c7c7;
+    --df-edge-color-selected: #4ea1ff;
+    --df-connection-line-color: #d0d0d0;
+    --df-attribution-color: #aaaaaa;
+    --df-minimap-mask-color: rgba(20, 20, 20, 0.6);
+    --df-minimap-mask-stroke-color: #555555;
+    --df-controls-button-bg: #2c2c2c;
+    --df-controls-button-bg-hover: #3a3a3a;
+    --df-controls-button-color: #eeeeee;
+    --df-controls-button-border-color: #444444;
+    --df-edge-label-color: #eeeeee;
+    --df-edge-label-bg-color: #2a2a2a;
+    --df-minimap-border-color: #3a3a3a;
+    --df-minimap-node-stroke-color: #c7c7c7;
+    --df-selection-box-shadow: 0 0 0 1px rgba(78, 161, 255, 0.45);
+}
+
+.dioxus-flow.dioxus-flow--connecting {
+    cursor: crosshair;
+}
+
+.dioxus-flow__panzoom {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.dioxus-flow__viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+}
+
+.dioxus-flow__nodes {
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
+.dioxus-flow__node-default,
+.dioxus-flow__node-input,
+.dioxus-flow__node-output,
+.dioxus-flow__node-group {
+    font-size: 12px;
+    color: inherit;
+    pointer-events: all;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.dioxus-flow__node-input {
+    border-color: #2a8af6;
+}
+
+.dioxus-flow__node-output {
+    border-color: #7fbe55;
+}
+
+.dioxus-flow__node-group {
+    background-color: rgba(240, 240, 240, 0.6);
+    border-style: dashed;
+}
+
+.dioxus-flow__node {
+    position: absolute;
+    cursor: grab;
+    user-select: none;
+    background-color: var(--df-node-color);
+    border: 1px solid var(--df-node-border-color);
+    border-radius: var(--df-node-border-radius);
+    padding: 10px;
+    box-sizing: border-box;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.dioxus-flow__node.selected {
+    box-shadow: 0 0 0 1px var(--df-selection-border-color);
+}
+
+.dioxus-flow__node:active {
+    cursor: grabbing;
+}
+
+.dioxus-flow__node:focus {
+    outline: 2px solid var(--df-selection-border-color);
+    outline-offset: 2px;
+}
+
+.dioxus-flow__handle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: var(--df-handle-color);
+    border: 1px solid var(--df-handle-border-color);
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.dioxus-flow__handle:focus {
+    outline: 2px solid var(--df-selection-border-color);
+    outline-offset: 2px;
+}
+
+.dioxus-flow__handle-left {
+    left: -3px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.dioxus-flow__handle-right {
+    right: -3px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.dioxus-flow__handle-top {
+    top: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.dioxus-flow__handle-bottom {
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.dioxus-flow__handle.connectable {
+    cursor: crosshair;
+}
+
+.dioxus-flow__handle.connecting {
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+.dioxus-flow__handle.connectingfrom {
+    outline: 2px solid var(--df-connection-line-color, #222222);
+    outline-offset: 2px;
+}
+
+.dioxus-flow__handle.connectable:hover {
+    transform: scale(1.08);
+    transition: transform 120ms ease;
+}
+
+.dioxus-flow__handle.connectingto.valid {
+    outline: 2px solid var(--df-connection-line-color-valid, #4caf50);
+    outline-offset: 2px;
+}
+
+.dioxus-flow__handle.connectingto.invalid {
+    outline: 2px solid var(--df-connection-line-color-invalid, #f44336);
+    outline-offset: 2px;
+}
+
+.dioxus-flow__edges {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.dioxus-flow__connection {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.dioxus-flow__connection-path {
+    fill: none;
+    stroke: var(--df-connection-line-color);
+    stroke-width: 1px;
+}
+
+.dioxus-flow__connection.invalid .dioxus-flow__connection-path {
+    stroke: var(--df-connection-line-color-invalid, #f44336);
+}
+
+.dioxus-flow__connection.valid .dioxus-flow__connection-path {
+    stroke: var(--df-connection-line-color-valid, #4caf50);
+}
+
+.dioxus-flow__edge-path {
+    fill: none;
+    stroke: var(--df-edge-color);
+    stroke-width: 1px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.dioxus-flow__edge-path.selected {
+    stroke: var(--df-edge-color-selected);
+}
+
+.dioxus-flow__edge-path.dashed {
+    stroke-dasharray: 4 4;
+}
+
+.dioxus-flow__edge-path:hover {
+    stroke: var(--df-edge-color-selected);
+}
+
+.dioxus-flow__edge-path:focus {
+    outline: none;
+}
+
+.dioxus-flow__edge.animated .dioxus-flow__edge-path,
+.dioxus-flow__edge-path.animated {
+    stroke-dasharray: 5 5;
+    animation: dioxus-flow__dash 1s linear infinite;
+}
+
+@keyframes dioxus-flow__dash {
+    to { stroke-dashoffset: -10; }
+}
+
+.dioxus-flow__edge-interaction {
+    fill: none;
+    stroke: transparent;
+    pointer-events: stroke;
+}
+
+.dioxus-flow__edge-reconnect {
+    fill: transparent;
+    stroke: transparent;
+    pointer-events: all;
+}
+
+.dioxus-flow__edge-reconnect:hover {
+    stroke: var(--df-edge-color-selected);
+    stroke-width: 1px;
+}
+
+.dioxus-flow__edge-label-text {
+    font-size: 12px;
+    fill: var(--df-edge-label-color);
+    user-select: none;
+}
+
+.dioxus-flow__edge-label-text.nopan,
+.dioxus-flow__edge-label-text.nodrag {
+    pointer-events: none;
+}
+
+.dioxus-flow__edge-label-bg {
+    fill: var(--df-edge-label-bg-color);
+    stroke: var(--df-edge-color);
+    stroke-width: 1px;
+}
+
+.dioxus-flow__edge-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.dioxus-flow__node-toolbar {
+    pointer-events: all;
+}
+
+.dioxus-flow__node-toolbar > * {
+    pointer-events: all;
+}
+
+.dioxus-flow__node-resizer {
+    position: absolute;
+    inset: -3px;
+    pointer-events: none;
+}
+
+.dioxus-flow__node-resizer-handle:hover {
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(91, 155, 255, 0.2);
+}
+
+.dioxus-flow__node-resizer-line {
+    position: absolute;
+    background: var(--df-selection-border-color);
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.dioxus-flow__node-resizer-line.top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+}
+
+.dioxus-flow__node-resizer-line.right {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1px;
+}
+
+.dioxus-flow__node-resizer-line.bottom {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+}
+
+.dioxus-flow__node-resizer-line.left {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 1px;
+}
+
+.dioxus-flow__node-resizer-handle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #ffffff;
+    border: 1px solid var(--df-selection-border-color);
+    border-radius: 2px;
+    pointer-events: all;
+    box-sizing: border-box;
+}
+
+.dioxus-flow__node-resizer-handle.top-left { top: -3px; left: -3px; cursor: nwse-resize; }
+.dioxus-flow__node-resizer-handle.top-right { top: -3px; right: -3px; cursor: nesw-resize; }
+.dioxus-flow__node-resizer-handle.bottom-left { bottom: -3px; left: -3px; cursor: nesw-resize; }
+.dioxus-flow__node-resizer-handle.bottom-right { bottom: -3px; right: -3px; cursor: nwse-resize; }
+.dioxus-flow__node-resizer-handle.top { top: -3px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.dioxus-flow__node-resizer-handle.right { right: -3px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.dioxus-flow__node-resizer-handle.bottom { bottom: -3px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.dioxus-flow__node-resizer-handle.left { left: -3px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+
+.dioxus-flow__edge-toolbar {
+    position: absolute;
+    pointer-events: all;
+}
+
+.dioxus-flow__panel {
+    position: absolute;
+    z-index: 5;
+    margin: 10px;
+}
+
+.dioxus-flow__panel.top-left { top: 0; left: 0; }
+.dioxus-flow__panel.top-center { top: 0; left: 50%; transform: translateX(-50%); }
+.dioxus-flow__panel.top-right { top: 0; right: 0; }
+.dioxus-flow__panel.bottom-left { bottom: 0; left: 0; }
+.dioxus-flow__panel.bottom-center { bottom: 0; left: 50%; transform: translateX(-50%); }
+.dioxus-flow__panel.bottom-right { bottom: 0; right: 0; }
+
+.dioxus-flow__background {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.dioxus-flow__controls {
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+    background: var(--df-controls-button-bg);
+    border: 1px solid var(--df-controls-button-border-color);
+}
+
+.dioxus-flow__controls button {
+    width: 26px;
+    height: 26px;
+    background: var(--df-controls-button-bg);
+    border: none;
+    color: var(--df-controls-button-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dioxus-flow__controls button + button {
+    border-top: 1px solid var(--df-controls-button-border-color);
+}
+
+.dioxus-flow__controls button:focus {
+    outline: 2px solid var(--df-selection-border-color);
+    outline-offset: 2px;
+}
+
+.dioxus-flow__controls button:hover {
+    background: var(--df-controls-button-bg-hover);
+}
+
+.dioxus-flow__controls button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.dioxus-flow__minimap {
+    background-color: var(--df-background-color);
+    border: 1px solid var(--df-minimap-border-color);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.dioxus-flow__minimap svg {
+    display: block;
+}
+
+.dioxus-flow__minimap-node {
+    fill: var(--df-node-color);
+    stroke: var(--df-minimap-node-stroke-color);
+    stroke-width: 1px;
+}
+
+.dioxus-flow__minimap-node.selected {
+    stroke: var(--df-selection-border-color);
+}
+
+.dioxus-flow__minimap {
+    background-color: var(--df-background-color);
+    border: 1px solid #eee;
+}
+
+.dioxus-flow__minimap-viewport {
+    fill: var(--df-minimap-mask-color);
+    stroke: var(--df-minimap-mask-stroke-color);
+    stroke-width: 1px;
+}
+
+.dioxus-flow__selection {
+    position: absolute;
+    background-color: var(--df-selection-color);
+    border: 1px dotted var(--df-selection-border-color);
+    box-shadow: var(--df-selection-box-shadow);
+    border-radius: 2px;
+}
