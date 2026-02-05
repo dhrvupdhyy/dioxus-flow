@@ -1,30 +1,50 @@
 /* Dioxus Flow base styles */
 
 .dioxus-flow {
+    direction: ltr;
     --df-background-color: #ffffff;
     --df-background-pattern-color: #b1b1b7;
-    --df-node-color: #ffffff;
+    --df-background-pattern-color-dots: #91919a;
+    --df-background-pattern-color-lines: #eeeeee;
+    --df-background-pattern-color-cross: #e2e2e2;
+    --df-node-color: inherit;
+    --df-node-background-color: #ffffff;
     --df-node-border-color: #1a192b;
-    --df-node-border-radius: 6px;
-    --df-handle-color: #555555;
+    --df-node-border-selected-color: #555555;
+    --df-node-border: 1px solid var(--df-node-border-color);
+    --df-node-border-selected: 1px solid var(--df-node-border-selected-color);
+    --df-node-border-radius: 3px;
+    --df-node-boxshadow-hover: 0 1px 4px 1px rgba(0, 0, 0, 0.08);
+    --df-node-boxshadow-selected: 0 0 0 0.5px #1a192b;
+    --df-node-group-background-color: rgba(240, 240, 240, 0.25);
+    --df-handle-color: #1a192b;
     --df-handle-border-color: #ffffff;
     --df-selection-color: rgba(0, 89, 220, 0.08);
-    --df-selection-border-color: #0059dc;
+    --df-selection-border-color: rgba(0, 89, 220, 0.8);
     --df-edge-color: #b1b1b7;
     --df-edge-color-selected: #555555;
-    --df-connection-line-color: #222222;
+    --df-connection-line-color: #b1b1b7;
+    --df-connection-line-width: 1px;
+    --df-edge-stroke-width: 1px;
     --df-attribution-color: #999999;
+    --df-attribution-bg: rgba(255, 255, 255, 0.5);
+    --df-minimap-bg-color: #ffffff;
+    --df-minimap-border-color: #e6e6e6;
     --df-minimap-mask-color: rgba(240, 240, 240, 0.6);
-    --df-minimap-mask-stroke-color: #333333;
+    --df-minimap-mask-stroke-color: transparent;
+    --df-minimap-mask-stroke-width: 1px;
+    --df-minimap-node-fill: #e2e2e2;
+    --df-minimap-node-stroke-color: transparent;
+    --df-minimap-node-stroke-width: 2px;
     --df-controls-button-bg: #fefefe;
     --df-controls-button-bg-hover: #f4f4f4;
-    --df-controls-button-color: #222222;
+    --df-controls-button-color: inherit;
+    --df-controls-button-color-hover: inherit;
     --df-controls-button-border-color: #eee;
-    --df-edge-label-color: #1a192b;
+    --df-controls-box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+    --df-edge-label-color: inherit;
     --df-edge-label-bg-color: #ffffff;
-    --df-minimap-border-color: #e6e6e6;
-    --df-minimap-node-stroke-color: #1a192b;
-    --df-selection-box-shadow: 0 0 0 1px rgba(0, 89, 220, 0.35);
+    --df-selection-box-shadow: none;
 
     width: 100%;
     height: 100%;
@@ -34,29 +54,45 @@
 }
 
 .dioxus-flow.dioxus-flow--dark {
-    --df-background-color: #1e1e1e;
-    --df-background-pattern-color: #4a4a55;
-    --df-node-color: #2a2a2a;
-    --df-node-border-color: #c7c7c7;
-    --df-handle-color: #c7c7c7;
-    --df-handle-border-color: #444444;
-    --df-selection-color: rgba(78, 161, 255, 0.12);
-    --df-selection-border-color: rgba(78, 161, 255, 0.8);
-    --df-edge-color: #c7c7c7;
-    --df-edge-color-selected: #4ea1ff;
-    --df-connection-line-color: #d0d0d0;
-    --df-attribution-color: #aaaaaa;
-    --df-minimap-mask-color: rgba(20, 20, 20, 0.6);
-    --df-minimap-mask-stroke-color: #555555;
-    --df-controls-button-bg: #2c2c2c;
-    --df-controls-button-bg-hover: #3a3a3a;
-    --df-controls-button-color: #eeeeee;
-    --df-controls-button-border-color: #444444;
-    --df-edge-label-color: #eeeeee;
-    --df-edge-label-bg-color: #2a2a2a;
+    --df-background-color: #141414;
+    --df-background-pattern-color: #777777;
+    --df-background-pattern-color-dots: #777777;
+    --df-background-pattern-color-lines: #777777;
+    --df-background-pattern-color-cross: #777777;
+    --df-node-color: #f8f8f8;
+    --df-node-background-color: #1e1e1e;
+    --df-node-border-color: #3c3c3c;
+    --df-node-border-selected-color: #999999;
+    --df-node-border: 1px solid var(--df-node-border-color);
+    --df-node-border-selected: 1px solid var(--df-node-border-selected-color);
+    --df-node-boxshadow-hover: 0 1px 4px 1px rgba(255, 255, 255, 0.08);
+    --df-node-boxshadow-selected: 0 0 0 0.5px #999999;
+    --df-node-group-background-color: rgba(240, 240, 240, 0.25);
+    --df-handle-color: #bebebe;
+    --df-handle-border-color: #1e1e1e;
+    --df-selection-color: rgba(200, 200, 220, 0.08);
+    --df-selection-border-color: rgba(200, 200, 220, 0.8);
+    --df-edge-color: #3e3e3e;
+    --df-edge-color-selected: #727272;
+    --df-connection-line-color: #b1b1b7;
+    --df-attribution-color: #999999;
+    --df-attribution-bg: rgba(150, 150, 150, 0.25);
+    --df-minimap-bg-color: #141414;
     --df-minimap-border-color: #3a3a3a;
-    --df-minimap-node-stroke-color: #c7c7c7;
-    --df-selection-box-shadow: 0 0 0 1px rgba(78, 161, 255, 0.45);
+    --df-minimap-mask-color: rgba(60, 60, 60, 0.6);
+    --df-minimap-mask-stroke-color: transparent;
+    --df-minimap-mask-stroke-width: 1px;
+    --df-minimap-node-fill: #2b2b2b;
+    --df-minimap-node-stroke-color: transparent;
+    --df-minimap-node-stroke-width: 2px;
+    --df-controls-button-bg: #2b2b2b;
+    --df-controls-button-bg-hover: #3e3e3e;
+    --df-controls-button-color: #f8f8f8;
+    --df-controls-button-color-hover: #ffffff;
+    --df-controls-button-border-color: #5b5b5b;
+    --df-controls-box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+    --df-edge-label-color: #f8f8f8;
+    --df-edge-label-bg-color: #141414;
 }
 
 .dioxus-flow.dioxus-flow--connecting {
@@ -69,6 +105,8 @@
     position: absolute;
     top: 0;
     left: 0;
+    z-index: 1;
+    touch-action: none;
 }
 
 .dioxus-flow__viewport {
@@ -76,12 +114,15 @@
     top: 0;
     left: 0;
     transform-origin: 0 0;
+    z-index: 2;
 }
 
 .dioxus-flow__nodes {
     position: absolute;
     width: 0;
     height: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
 }
 
 .dioxus-flow__node-default,
@@ -89,45 +130,69 @@
 .dioxus-flow__node-output,
 .dioxus-flow__node-group {
     font-size: 12px;
-    color: inherit;
+    color: var(--df-node-color);
     pointer-events: all;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    border-radius: var(--df-node-border-radius);
+    border: var(--df-node-border);
+    background-color: var(--df-node-background-color);
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-}
-
-.dioxus-flow__node-input {
-    border-color: #2a8af6;
-}
-
-.dioxus-flow__node-output {
-    border-color: #7fbe55;
+    box-sizing: border-box;
 }
 
 .dioxus-flow__node-group {
-    background-color: rgba(240, 240, 240, 0.6);
-    border-style: dashed;
+    background-color: var(--df-node-group-background-color);
 }
 
 .dioxus-flow__node {
     position: absolute;
-    cursor: grab;
+    cursor: default;
     user-select: none;
-    background-color: var(--df-node-color);
-    border: 1px solid var(--df-node-border-color);
+    background-color: transparent;
+    border: none;
     border-radius: var(--df-node-border-radius);
-    padding: 10px;
     box-sizing: border-box;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    pointer-events: all;
+    transform-origin: 0 0;
 }
 
-.dioxus-flow__node.selected {
-    box-shadow: 0 0 0 1px var(--df-selection-border-color);
+.dioxus-flow__node.selectable {
+    cursor: pointer;
 }
 
-.dioxus-flow__node:active {
+.dioxus-flow__node.draggable {
+    cursor: grab;
+}
+
+.dioxus-flow__node.draggable.dragging {
     cursor: grabbing;
+}
+
+.dioxus-flow__node-default.selectable:hover,
+.dioxus-flow__node-input.selectable:hover,
+.dioxus-flow__node-output.selectable:hover,
+.dioxus-flow__node-group.selectable:hover {
+    box-shadow: var(--df-node-boxshadow-hover);
+}
+
+.dioxus-flow__node-default.selectable.selected,
+.dioxus-flow__node-input.selectable.selected,
+.dioxus-flow__node-output.selectable.selected,
+.dioxus-flow__node-group.selectable.selected,
+.dioxus-flow__node-default.selectable:focus,
+.dioxus-flow__node-default.selectable:focus-visible,
+.dioxus-flow__node-input.selectable:focus,
+.dioxus-flow__node-input.selectable:focus-visible,
+.dioxus-flow__node-output.selectable:focus,
+.dioxus-flow__node-output.selectable:focus-visible,
+.dioxus-flow__node-group.selectable:focus,
+.dioxus-flow__node-group.selectable:focus-visible {
+    box-shadow: var(--df-node-boxshadow-selected);
 }
 
 .dioxus-flow__node:focus {
@@ -143,6 +208,7 @@
     border: 1px solid var(--df-handle-border-color);
     border-radius: 50%;
     box-sizing: border-box;
+    pointer-events: none;
 }
 
 .dioxus-flow__handle:focus {
@@ -151,55 +217,44 @@
 }
 
 .dioxus-flow__handle-left {
-    left: -3px;
+    left: 0;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translate(-50%, -50%);
 }
 
 .dioxus-flow__handle-right {
-    right: -3px;
+    right: 0;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translate(50%, -50%);
 }
 
 .dioxus-flow__handle-top {
-    top: -3px;
+    top: 0;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
 }
 
 .dioxus-flow__handle-bottom {
-    bottom: -3px;
+    bottom: 0;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, 50%);
 }
 
-.dioxus-flow__handle.connectable {
+.dioxus-flow__handle.connectingfrom,
+.dioxus-flow__handle.connectionindicator {
+    pointer-events: all;
+}
+
+.dioxus-flow__handle.connectionindicator {
     cursor: crosshair;
 }
 
-.dioxus-flow__handle.connecting {
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
-}
-
-.dioxus-flow__handle.connectingfrom {
-    outline: 2px solid var(--df-connection-line-color, #222222);
-    outline-offset: 2px;
-}
-
-.dioxus-flow__handle.connectable:hover {
-    transform: scale(1.08);
-    transition: transform 120ms ease;
-}
-
 .dioxus-flow__handle.connectingto.valid {
-    outline: 2px solid var(--df-connection-line-color-valid, #4caf50);
-    outline-offset: 2px;
+    background-color: var(--df-connection-line-color-valid, #4caf50);
 }
 
 .dioxus-flow__handle.connectingto.invalid {
-    outline: 2px solid var(--df-connection-line-color-invalid, #f44336);
-    outline-offset: 2px;
+    background-color: var(--df-connection-line-color-invalid, #f44336);
 }
 
 .dioxus-flow__edges {
@@ -221,7 +276,7 @@
 .dioxus-flow__connection-path {
     fill: none;
     stroke: var(--df-connection-line-color);
-    stroke-width: 1px;
+    stroke-width: var(--df-connection-line-width);
 }
 
 .dioxus-flow__connection.invalid .dioxus-flow__connection-path {
@@ -235,35 +290,38 @@
 .dioxus-flow__edge-path {
     fill: none;
     stroke: var(--df-edge-color);
-    stroke-width: 1px;
+    stroke-width: var(--df-edge-stroke-width);
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
-.dioxus-flow__edge-path.selected {
-    stroke: var(--df-edge-color-selected);
+.dioxus-flow__edge.selectable {
+    cursor: pointer;
 }
 
-.dioxus-flow__edge-path.dashed {
-    stroke-dasharray: 4 4;
+.dioxus-flow__edge {
+    pointer-events: visibleStroke;
 }
 
-.dioxus-flow__edge-path:hover {
-    stroke: var(--df-edge-color-selected);
-}
-
-.dioxus-flow__edge-path:focus {
+.dioxus-flow__edge:focus,
+.dioxus-flow__edge:focus-visible {
     outline: none;
 }
 
-.dioxus-flow__edge.animated .dioxus-flow__edge-path,
-.dioxus-flow__edge-path.animated {
-    stroke-dasharray: 5 5;
-    animation: dioxus-flow__dash 1s linear infinite;
+.dioxus-flow__edge.selected .dioxus-flow__edge-path,
+.dioxus-flow__edge.selectable:focus .dioxus-flow__edge-path,
+.dioxus-flow__edge.selectable:focus-visible .dioxus-flow__edge-path {
+    stroke: var(--df-edge-color-selected);
 }
 
-@keyframes dioxus-flow__dash {
-    to { stroke-dashoffset: -10; }
+.dioxus-flow__edge.animated .dioxus-flow__edge-path {
+    stroke-dasharray: 5;
+    animation: dioxus-flow__dash 0.5s linear infinite;
+}
+
+.dioxus-flow__edge.animated .dioxus-flow__edge-interaction {
+    stroke-dasharray: none;
+    animation: none;
 }
 
 .dioxus-flow__edge-interaction {
@@ -272,10 +330,16 @@
     pointer-events: stroke;
 }
 
+.dioxus-flow__edgeupdater {
+    cursor: move;
+    pointer-events: all;
+}
+
 .dioxus-flow__edge-reconnect {
     fill: transparent;
     stroke: transparent;
     pointer-events: all;
+    cursor: crosshair;
 }
 
 .dioxus-flow__edge-reconnect:hover {
@@ -284,9 +348,26 @@
 }
 
 .dioxus-flow__edge-label-text {
-    font-size: 12px;
+    font-size: 10px;
     fill: var(--df-edge-label-color);
     user-select: none;
+    pointer-events: none;
+}
+
+.dioxus-flow__edge-textwrapper,
+.dioxus-flow__edge-label {
+    pointer-events: all;
+}
+
+.dioxus-flow__edge-text {
+    font-size: 10px;
+    fill: var(--df-edge-label-color);
+    pointer-events: none;
+    user-select: none;
+}
+
+.dioxus-flow__edge-textbg {
+    fill: var(--df-edge-label-bg-color);
 }
 
 .dioxus-flow__edge-label-text.nopan,
@@ -305,6 +386,9 @@
     top: 0;
     left: 0;
     pointer-events: none;
+    user-select: none;
+    width: 100%;
+    height: 100%;
 }
 
 .dioxus-flow__node-toolbar {
@@ -321,65 +405,70 @@
     pointer-events: none;
 }
 
-.dioxus-flow__node-resizer-handle:hover {
-    background: #ffffff;
-    box-shadow: 0 0 0 2px rgba(91, 155, 255, 0.2);
-}
-
 .dioxus-flow__node-resizer-line {
     position: absolute;
-    background: var(--df-selection-border-color);
-    opacity: 0.35;
+    border-color: var(--df-node-resizer-color, #3367d9);
+    border-width: 0;
+    border-style: solid;
     pointer-events: none;
+}
+
+.dioxus-flow__node-resizer-line.left,
+.dioxus-flow__node-resizer-line.right {
+    width: 1px;
+    transform: translate(-50%, 0);
+    top: 0;
+    height: 100%;
+}
+
+.dioxus-flow__node-resizer-line.left {
+    left: 0;
+    border-left-width: 1px;
+}
+
+.dioxus-flow__node-resizer-line.right {
+    left: 100%;
+    border-right-width: 1px;
+}
+
+.dioxus-flow__node-resizer-line.top,
+.dioxus-flow__node-resizer-line.bottom {
+    height: 1px;
+    transform: translate(0, -50%);
+    left: 0;
+    width: 100%;
 }
 
 .dioxus-flow__node-resizer-line.top {
     top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-}
-
-.dioxus-flow__node-resizer-line.right {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 1px;
+    border-top-width: 1px;
 }
 
 .dioxus-flow__node-resizer-line.bottom {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 1px;
-}
-
-.dioxus-flow__node-resizer-line.left {
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 1px;
+    top: 100%;
+    border-bottom-width: 1px;
 }
 
 .dioxus-flow__node-resizer-handle {
     position: absolute;
-    width: 6px;
-    height: 6px;
-    background: #ffffff;
-    border: 1px solid var(--df-selection-border-color);
-    border-radius: 2px;
+    width: 5px;
+    height: 5px;
+    border: 1px solid #ffffff;
+    border-radius: 1px;
+    background-color: var(--df-node-resizer-color, #3367d9);
     pointer-events: all;
     box-sizing: border-box;
+    translate: -50% -50%;
 }
 
-.dioxus-flow__node-resizer-handle.top-left { top: -3px; left: -3px; cursor: nwse-resize; }
-.dioxus-flow__node-resizer-handle.top-right { top: -3px; right: -3px; cursor: nesw-resize; }
-.dioxus-flow__node-resizer-handle.bottom-left { bottom: -3px; left: -3px; cursor: nesw-resize; }
-.dioxus-flow__node-resizer-handle.bottom-right { bottom: -3px; right: -3px; cursor: nwse-resize; }
-.dioxus-flow__node-resizer-handle.top { top: -3px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
-.dioxus-flow__node-resizer-handle.right { right: -3px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-.dioxus-flow__node-resizer-handle.bottom { bottom: -3px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
-.dioxus-flow__node-resizer-handle.left { left: -3px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.dioxus-flow__node-resizer-handle.left { left: 0; top: 50%; cursor: ew-resize; }
+.dioxus-flow__node-resizer-handle.right { left: 100%; top: 50%; cursor: ew-resize; }
+.dioxus-flow__node-resizer-handle.top { left: 50%; top: 0; cursor: ns-resize; }
+.dioxus-flow__node-resizer-handle.bottom { left: 50%; top: 100%; cursor: ns-resize; }
+.dioxus-flow__node-resizer-handle.top.left { left: 0; cursor: nwse-resize; }
+.dioxus-flow__node-resizer-handle.bottom.right { left: 100%; cursor: nwse-resize; }
+.dioxus-flow__node-resizer-handle.top.right { left: 100%; cursor: nesw-resize; }
+.dioxus-flow__node-resizer-handle.bottom.left { left: 0; cursor: nesw-resize; }
 
 .dioxus-flow__edge-toolbar {
     position: absolute;
@@ -389,14 +478,14 @@
 .dioxus-flow__panel {
     position: absolute;
     z-index: 5;
-    margin: 10px;
+    margin: 15px;
 }
 
 .dioxus-flow__panel.top-left { top: 0; left: 0; }
-.dioxus-flow__panel.top-center { top: 0; left: 50%; transform: translateX(-50%); }
+.dioxus-flow__panel.top-center { top: 0; left: 50%; transform: translateX(-50%) translateX(-15px); }
 .dioxus-flow__panel.top-right { top: 0; right: 0; }
 .dioxus-flow__panel.bottom-left { bottom: 0; left: 0; }
-.dioxus-flow__panel.bottom-center { bottom: 0; left: 50%; transform: translateX(-50%); }
+.dioxus-flow__panel.bottom-center { bottom: 0; left: 50%; transform: translateX(-50%) translateX(-15px); }
 .dioxus-flow__panel.bottom-right { bottom: 0; right: 0; }
 
 .dioxus-flow__background {
@@ -406,14 +495,14 @@
     top: 0;
     left: 0;
     pointer-events: none;
+    background-color: var(--df-background-color);
+    z-index: 0;
 }
 
 .dioxus-flow__controls {
     display: flex;
     flex-direction: column;
-    box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08);
-    background: var(--df-controls-button-bg);
-    border: 1px solid var(--df-controls-button-border-color);
+    box-shadow: var(--df-controls-box-shadow);
 }
 
 .dioxus-flow__controls button {
@@ -426,29 +515,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 4px;
+    user-select: none;
 }
 
 .dioxus-flow__controls button + button {
     border-top: 1px solid var(--df-controls-button-border-color);
 }
 
-.dioxus-flow__controls button:focus {
-    outline: 2px solid var(--df-selection-border-color);
-    outline-offset: 2px;
-}
-
 .dioxus-flow__controls button:hover {
     background: var(--df-controls-button-bg-hover);
+    color: var(--df-controls-button-color-hover);
 }
 
 .dioxus-flow__controls button:disabled {
+    pointer-events: none;
     opacity: 0.6;
     cursor: default;
 }
 
 .dioxus-flow__minimap {
-    background-color: var(--df-background-color);
-    border: 1px solid var(--df-minimap-border-color);
+    background-color: var(--df-minimap-bg-color);
+    border: 1px solid var(--df-minimap-border-color, #eee);
     border-radius: 2px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
@@ -458,30 +546,59 @@
 }
 
 .dioxus-flow__minimap-node {
-    fill: var(--df-node-color);
+    fill: var(--df-minimap-node-fill);
     stroke: var(--df-minimap-node-stroke-color);
-    stroke-width: 1px;
+    stroke-width: var(--df-minimap-node-stroke-width);
 }
 
 .dioxus-flow__minimap-node.selected {
     stroke: var(--df-selection-border-color);
 }
 
-.dioxus-flow__minimap {
-    background-color: var(--df-background-color);
-    border: 1px solid #eee;
-}
-
 .dioxus-flow__minimap-viewport {
     fill: var(--df-minimap-mask-color);
     stroke: var(--df-minimap-mask-stroke-color);
-    stroke-width: 1px;
+    stroke-width: var(--df-minimap-mask-stroke-width);
 }
 
 .dioxus-flow__selection {
     position: absolute;
     background-color: var(--df-selection-color);
     border: 1px dotted var(--df-selection-border-color);
-    box-shadow: var(--df-selection-box-shadow);
     border-radius: 2px;
+}
+
+.dioxus-flow__edgelabel-renderer {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    user-select: none;
+    left: 0;
+    top: 0;
+}
+
+.dioxus-flow__viewport-portal {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    user-select: none;
+}
+
+.dioxus-flow__attribution {
+    font-size: 10px;
+    background: var(--df-attribution-bg);
+    padding: 2px 3px;
+    margin: 0;
+}
+
+.dioxus-flow__attribution a {
+    text-decoration: none;
+    color: var(--df-attribution-color);
+}
+
+@keyframes dioxus-flow__dash {
+    from { stroke-dashoffset: 10; }
 }

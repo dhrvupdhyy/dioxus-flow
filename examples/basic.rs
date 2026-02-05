@@ -1,9 +1,9 @@
 use dioxus::prelude::*;
 use std::collections::HashMap;
 
+use dioxus_flow::BackgroundVariant;
 use dioxus_flow::components::{Background, Controls, DefaultNode, DioxusFlow, MiniMap};
 use dioxus_flow::types::{Connection, Edge, EdgeMarker, Node, SelectionMode, XYPosition};
-use dioxus_flow::BackgroundVariant;
 
 fn main() {
     dioxus::launch(App);
@@ -75,7 +75,7 @@ fn App() -> Element {
 
     rsx! {
         div {
-            style: "width: 100vw; height: 100vh; --df-background-pattern-color: #d6d6d6; --df-node-border-color: #e3e3e3; --df-edge-color: #b7b7b7; --df-node-border-radius: 10px; --df-handle-color: #d0d0d0; --df-handle-border-color: #ffffff;",
+            style: "width: 100vw; height: 100vh; --df-background-pattern-color-dots: #d6d6d6; --df-node-border-color: #e3e3e3; --df-edge-color: #b7b7b7; --df-node-border-radius: 10px; --df-handle-color: #d0d0d0; --df-handle-border-color: #ffffff;",
             style { "{css}" }
             DioxusFlow {
                 default_nodes: nodes,

@@ -75,7 +75,6 @@ pub fn EdgeToolbar<
 
     rsx! {
         crate::components::EdgeLabelRenderer::<N, E> {
-            no_scale: true,
             div {
                 class: "dioxus-flow__edge-toolbar {class}",
                 style: "{combined_style}",

@@ -4,7 +4,7 @@ use crate::types::*;
 use dioxus::prelude::*;
 use dioxus::prelude::{ReadableExt, WritableExt};
 use js_sys::Date;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use wasm_bindgen::JsCast;
 
 /// Main flow state that holds all reactive data
@@ -29,6 +29,15 @@ pub struct FlowState<
     pub min_zoom: Signal<f64>,
     pub max_zoom: Signal<f64>,
     pub translate_extent: Signal<Option<CoordinateExtent>>,
+    pub node_origin: Signal<NodeOrigin>,
+    pub color_mode: Signal<ColorMode>,
+    pub default_marker_color: Signal<Option<String>>,
+    pub z_index_mode: Signal<ZIndexMode>,
+    pub elevate_nodes_on_select: Signal<bool>,
+    pub elevate_edges_on_select: Signal<bool>,
+    pub disable_keyboard_a11y: Signal<bool>,
+    pub debug: Signal<bool>,
+    pub aria_label_config: Signal<AriaLabelConfig>,
 
     // Interaction state
     pub nodes_draggable: Signal<bool>,
@@ -53,10 +62,12 @@ pub struct FlowState<
     pub connection: Signal<ConnectionState>,
     pub connection_mode: Signal<ConnectionMode>,
     pub connection_radius: Signal<f64>,
+    pub reconnect_radius: Signal<f64>,
     pub connection_line_type: Signal<ConnectionLineType>,
     pub connection_line_style: Signal<Option<String>>,
     pub connection_line_component: Signal<Option<Component<crate::types::ConnectionLineProps>>>,
     pub is_valid_connection: Signal<Option<IsValidConnection>>,
+    pub on_viewport_change: Signal<Option<EventHandler<Viewport>>>,
 
     // Grid/snapping
     pub snap_to_grid: Signal<bool>,
@@ -67,23 +78,45 @@ pub struct FlowState<
     pub pan_on_drag: Signal<bool>,
     pub pan_on_scroll: Signal<bool>,
     pub pan_on_scroll_mode: Signal<PanOnScrollMode>,
+    pub pan_on_scroll_speed: Signal<f64>,
     pub zoom_on_scroll: Signal<bool>,
     pub zoom_on_pinch: Signal<bool>,
     pub zoom_on_double_click: Signal<bool>,
+    pub prevent_scrolling: Signal<bool>,
+    pub pan_activation_key_pressed: Signal<bool>,
+    pub zoom_activation_key_pressed: Signal<bool>,
+    pub pan_on_drag_buttons: Signal<Option<Vec<i32>>>,
+    pub auto_pan_on_node_drag: Signal<bool>,
+    pub auto_pan_on_connect: Signal<bool>,
+    pub auto_pan_speed: Signal<f64>,
+    pub auto_pan_on_node_focus: Signal<bool>,
 
     // Selection config
     pub selection_on_drag: Signal<bool>,
+    pub select_nodes_on_drag: Signal<bool>,
     pub selection_key_pressed: Signal<bool>,
     pub multi_selection_key_pressed: Signal<bool>,
     pub selection_mode: Signal<SelectionMode>,
     pub node_extent: Signal<Option<CoordinateExtent>>,
     pub focused_node_id: Signal<Option<String>>,
+    pub focused_edge_id: Signal<Option<String>>,
 
     // Delete key
     pub delete_key_pressed: Signal<bool>,
 
     // Node dragging
     pub node_drag: Signal<Option<NodeDragState>>,
+    pub node_drag_threshold: Signal<f64>,
+    pub connection_drag_threshold: Signal<f64>,
+    pub connect_on_click: Signal<bool>,
+    pub no_drag_class_name: Signal<String>,
+    pub no_pan_class_name: Signal<String>,
+    pub no_wheel_class_name: Signal<String>,
+    pub pending_node_click: Signal<Option<PendingNodeClick>>,
+    pub on_connect_start: Signal<Option<EventHandler<crate::types::ConnectionStartEvent>>>,
+    pub on_connect_end: Signal<Option<EventHandler<crate::types::ConnectionEndEvent>>>,
+    pub on_error: Signal<Option<OnError>>,
+    pub viewport_animation_generation: Signal<u64>,
 
     // Internal markers
     _node_marker: std::marker::PhantomData<N>,
@@ -108,6 +141,15 @@ where
             min_zoom: Signal::new(0.5),
             max_zoom: Signal::new(2.0),
             translate_extent: Signal::new(None),
+            node_origin: Signal::new((0.0, 0.0)),
+            color_mode: Signal::new(ColorMode::Light),
+            default_marker_color: Signal::new(None),
+            z_index_mode: Signal::new(ZIndexMode::Basic),
+            elevate_nodes_on_select: Signal::new(true),
+            elevate_edges_on_select: Signal::new(false),
+            disable_keyboard_a11y: Signal::new(false),
+            debug: Signal::new(false),
+            aria_label_config: Signal::new(AriaLabelConfig::default()),
             nodes_draggable: Signal::new(true),
             nodes_connectable: Signal::new(true),
             nodes_focusable: Signal::new(true),
@@ -125,27 +167,51 @@ where
             connection: Signal::new(ConnectionState::default()),
             connection_mode: Signal::new(ConnectionMode::Strict),
             connection_radius: Signal::new(20.0),
+            reconnect_radius: Signal::new(10.0),
             connection_line_type: Signal::new(ConnectionLineType::Bezier),
             connection_line_style: Signal::new(None),
             connection_line_component: Signal::new(None),
             is_valid_connection: Signal::new(None),
+            on_viewport_change: Signal::new(None),
             snap_to_grid: Signal::new(false),
             snap_grid: Signal::new((15.0, 15.0)),
             panning: Signal::new(false),
             pan_on_drag: Signal::new(true),
             pan_on_scroll: Signal::new(false),
             pan_on_scroll_mode: Signal::new(PanOnScrollMode::Free),
+            pan_on_scroll_speed: Signal::new(0.5),
             zoom_on_scroll: Signal::new(true),
             zoom_on_pinch: Signal::new(true),
             zoom_on_double_click: Signal::new(true),
+            prevent_scrolling: Signal::new(true),
+            pan_activation_key_pressed: Signal::new(false),
+            zoom_activation_key_pressed: Signal::new(false),
+            pan_on_drag_buttons: Signal::new(None),
+            auto_pan_on_node_drag: Signal::new(true),
+            auto_pan_on_connect: Signal::new(true),
+            auto_pan_speed: Signal::new(15.0),
+            auto_pan_on_node_focus: Signal::new(true),
             selection_on_drag: Signal::new(false),
+            select_nodes_on_drag: Signal::new(true),
             selection_key_pressed: Signal::new(false),
             multi_selection_key_pressed: Signal::new(false),
             selection_mode: Signal::new(SelectionMode::Partial),
             node_extent: Signal::new(None),
             focused_node_id: Signal::new(None),
+            focused_edge_id: Signal::new(None),
             delete_key_pressed: Signal::new(false),
             node_drag: Signal::new(None),
+            node_drag_threshold: Signal::new(1.0),
+            connection_drag_threshold: Signal::new(1.0),
+            connect_on_click: Signal::new(true),
+            no_drag_class_name: Signal::new("nodrag".to_string()),
+            no_pan_class_name: Signal::new("nopan".to_string()),
+            no_wheel_class_name: Signal::new("nowheel".to_string()),
+            pending_node_click: Signal::new(None),
+            on_connect_start: Signal::new(None),
+            on_connect_end: Signal::new(None),
+            on_error: Signal::new(None),
+            viewport_animation_generation: Signal::new(0),
             _node_marker: std::marker::PhantomData,
             _edge_marker: std::marker::PhantomData,
         }
@@ -199,15 +265,39 @@ where
 
     /// Compute absolute position including parent offsets
     fn compute_absolute_position(&self, node: &Node<N>, all_nodes: &[Node<N>]) -> XYPosition {
-        let mut position = node.position;
+        let mut visited = HashSet::new();
+        self.compute_absolute_position_inner(node, all_nodes, &mut visited)
+    }
+
+    fn compute_absolute_position_inner(
+        &self,
+        node: &Node<N>,
+        all_nodes: &[Node<N>],
+        visited: &mut HashSet<String>,
+    ) -> XYPosition {
+        let dims = node.get_dimensions();
+        let origin = *self.node_origin.read();
+        let mut position = XYPosition {
+            x: node.position.x - dims.width * origin.0,
+            y: node.position.y - dims.height * origin.1,
+        };
+
+        if !visited.insert(node.id.clone()) {
+            self.report_error(format!(
+                "cycle detected while computing absolute position for node {}",
+                node.id
+            ));
+            return position;
+        }
 
         if let Some(parent_id) = &node.parent_id {
             if let Some(parent) = all_nodes.iter().find(|n| &n.id == parent_id) {
-                let parent_pos = self.compute_absolute_position(parent, all_nodes);
+                let parent_pos = self.compute_absolute_position_inner(parent, all_nodes, visited);
                 position = position + parent_pos;
             }
         }
 
+        visited.remove(&node.id);
         position
     }
 
@@ -393,6 +483,8 @@ where
         };
         let clamped = self.clamp_viewport(next);
         self.viewport.set(clamped);
+        self.refresh_connection_position();
+        self.notify_viewport_change(clamped);
     }
 
     /// Zoom out by a factor
@@ -406,6 +498,8 @@ where
         };
         let clamped = self.clamp_viewport(next);
         self.viewport.set(clamped);
+        self.refresh_connection_position();
+        self.notify_viewport_change(clamped);
     }
 
     /// Set zoom level
@@ -419,6 +513,8 @@ where
         };
         let clamped = self.clamp_viewport(next);
         self.viewport.set(clamped);
+        self.refresh_connection_position();
+        self.notify_viewport_change(clamped);
     }
 
     /// Pan by delta
@@ -431,6 +527,50 @@ where
         };
         let clamped = self.clamp_viewport(next);
         self.viewport.set(clamped);
+        self.refresh_connection_position();
+        self.notify_viewport_change(clamped);
+    }
+
+    /// Pan viewport to ensure a node is visible
+    pub fn ensure_node_visible(&mut self, node_id: &str) {
+        let Some(internal) = self.node_lookup.read().get(node_id).cloned() else {
+            return;
+        };
+        let viewport = *self.viewport.read();
+        let zoom = viewport.zoom.max(0.0001);
+        let width = *self.width.read();
+        let height = *self.height.read();
+        let view_rect = Rect {
+            x: -viewport.x / zoom,
+            y: -viewport.y / zoom,
+            width: width / zoom,
+            height: height / zoom,
+        };
+        let node_rect = Rect {
+            x: internal.position_absolute.x,
+            y: internal.position_absolute.y,
+            width: internal.dimensions.width,
+            height: internal.dimensions.height,
+        };
+
+        let mut dx = 0.0;
+        let mut dy = 0.0;
+
+        if node_rect.x < view_rect.x {
+            dx = (view_rect.x - node_rect.x) * zoom;
+        } else if node_rect.x + node_rect.width > view_rect.x + view_rect.width {
+            dx = (view_rect.x + view_rect.width - (node_rect.x + node_rect.width)) * zoom;
+        }
+
+        if node_rect.y < view_rect.y {
+            dy = (view_rect.y - node_rect.y) * zoom;
+        } else if node_rect.y + node_rect.height > view_rect.y + view_rect.height {
+            dy = (view_rect.y + view_rect.height - (node_rect.y + node_rect.height)) * zoom;
+        }
+
+        if dx != 0.0 || dy != 0.0 {
+            self.pan_by(XYPosition { x: dx, y: dy });
+        }
     }
 
     /// Set viewport center
@@ -462,7 +602,7 @@ where
 
         let padding = options.padding.unwrap_or(0.1);
 
-        let bounds = get_nodes_bounds(&nodes);
+        let bounds = crate::utils::get_nodes_bounds(&nodes);
         if bounds.width == 0.0 || bounds.height == 0.0 {
             return;
         }
@@ -519,19 +659,29 @@ where
         if let Some(duration) = duration {
             if duration == 0 {
                 self.viewport.set(viewport);
+                self.refresh_connection_position();
+                self.notify_viewport_change(viewport);
             } else {
                 self.animate_viewport(viewport, duration);
             }
         } else {
             self.viewport.set(viewport);
+            self.refresh_connection_position();
+            self.notify_viewport_change(viewport);
         }
     }
 
     fn animate_viewport(&mut self, target: Viewport, duration: u32) {
+        let generation = {
+            let mut current = self.viewport_animation_generation.write();
+            *current += 1;
+            *current
+        };
         let start = *self.viewport.read();
         let duration_ms = duration as f64;
         let Some(window) = web_sys::window() else {
             self.viewport.set(target);
+            self.report_error("window not available for viewport animation");
             return;
         };
         let start_time = Date::now();
@@ -544,6 +694,10 @@ where
         let raf_loop = raf.clone();
         *raf_clone.borrow_mut() = Some(wasm_bindgen::closure::Closure::wrap(Box::new(
             move |time: f64| {
+                if *state.viewport_animation_generation.read() != generation {
+                    raf_loop.borrow_mut().take();
+                    return;
+                }
                 let mut t = (time - start_time) / duration_ms;
                 if t < 0.0 {
                     t = 0.0;
@@ -560,6 +714,8 @@ where
                     zoom: lerp(start.zoom, target.zoom),
                 };
                 state.viewport.set(next);
+                state.refresh_connection_position();
+                state.notify_viewport_change(next);
 
                 if t < 1.0 {
                     if let Some(window) = web_sys::window() {
@@ -574,14 +730,21 @@ where
             },
         )));
 
-        let _ = window.request_animation_frame(
-            raf_clone
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .as_ref()
-                .unchecked_ref(),
-        );
+        if let Some(callback) = raf_clone.borrow().as_ref() {
+            let _ = window.request_animation_frame(callback.as_ref().unchecked_ref());
+        }
+    }
+
+    fn notify_viewport_change(&self, viewport: Viewport) {
+        if let Some(handler) = self.on_viewport_change.read().clone() {
+            handler.call(viewport);
+        }
+    }
+
+    pub fn report_error(&self, message: impl Into<String>) {
+        if let Some(handler) = *self.on_error.read() {
+            handler(message.into());
+        }
     }
 
     fn ease_in_out_cubic(t: f64) -> f64 {
@@ -601,13 +764,63 @@ where
         }
     }
 
+    pub fn refresh_connection_position(&mut self) {
+        if !self.connection.read().in_progress {
+            return;
+        }
+        let mut connection = self.connection.read().clone();
+        let mut updated = false;
+        if let (Some(to_node), Some(to_type)) = (connection.to_node.clone(), connection.to_type) {
+            if let Some(internal) = self.node_lookup.read().get(&to_node) {
+                if let Some(flow_pos) = Self::resolve_handle_flow_position(
+                    internal,
+                    to_type,
+                    connection.to_handle.as_deref(),
+                ) {
+                    let screen_pos = self.flow_to_screen_position(flow_pos);
+                    connection.update_screen_position(screen_pos, flow_pos);
+                    updated = true;
+                }
+            }
+        }
+        if !updated {
+            if let Some(screen_pos) = connection.to_position_screen {
+                let flow_pos = self.screen_to_flow_position(screen_pos);
+                connection.update_screen_position(screen_pos, flow_pos);
+            }
+        }
+        self.connection.set(connection);
+    }
+
+    // Prefer actual handle bounds when available so zoom/pan keep snapped targets aligned.
+    fn resolve_handle_flow_position(
+        internal: &InternalNode<N>,
+        handle_type: HandleType,
+        handle_id: Option<&str>,
+    ) -> Option<XYPosition> {
+        internal.handle_bounds.as_ref().and_then(|bounds| {
+            let handles = match handle_type {
+                HandleType::Source => &bounds.source,
+                HandleType::Target => &bounds.target,
+            };
+            let handle = if let Some(id) = handle_id {
+                handles.iter().find(|handle| handle.id.as_deref() == Some(id))
+            } else {
+                handles.first()
+            }?;
+            Some(XYPosition::new(
+                internal.position_absolute.x + handle.x + handle.width / 2.0,
+                internal.position_absolute.y + handle.y + handle.height / 2.0,
+            ))
+        })
+    }
+
     /// Clamp viewport to translate extent if configured.
     pub fn clamp_viewport(&self, viewport: Viewport) -> Viewport {
         let extent = *self.translate_extent.read();
-        if extent.is_none() {
+        let Some(extent) = extent else {
             return viewport;
-        }
-        let extent = extent.unwrap();
+        };
         let width = *self.width.read();
         let height = *self.height.read();
         if width == 0.0 || height == 0.0 {
@@ -620,22 +833,42 @@ where
         let max_y = extent[1][1];
         let zoom = viewport.zoom;
 
-        let mut min_screen_x = width - max_x * zoom;
-        let mut max_screen_x = -min_x * zoom;
-        let mut min_screen_y = height - max_y * zoom;
-        let mut max_screen_y = -min_y * zoom;
-
-        if min_screen_x > max_screen_x {
-            std::mem::swap(&mut min_screen_x, &mut max_screen_x);
-        }
-        if min_screen_y > max_screen_y {
-            std::mem::swap(&mut min_screen_y, &mut max_screen_y);
-        }
+        let clamp_axis = |min: f64, max: f64, pos: f64, size: f64| -> f64 {
+            if min.is_finite() && max.is_finite() {
+                let d0 = (0.0 - pos) / zoom - min;
+                let d1 = (size - pos) / zoom - max;
+                let adjust = if d1 > d0 {
+                    (d0 + d1) / 2.0
+                } else if d0 > 0.0 {
+                    d0
+                } else if d1 < 0.0 {
+                    d1
+                } else {
+                    0.0
+                };
+                pos + adjust * zoom
+            } else {
+                let mut min_screen = if max.is_finite() {
+                    size - max * zoom
+                } else {
+                    f64::NEG_INFINITY
+                };
+                let mut max_screen = if min.is_finite() {
+                    -min * zoom
+                } else {
+                    f64::INFINITY
+                };
+                if min_screen > max_screen {
+                    std::mem::swap(&mut min_screen, &mut max_screen);
+                }
+                pos.clamp(min_screen, max_screen)
+            }
+        };
 
         Viewport {
-            x: viewport.x.clamp(min_screen_x, max_screen_x),
-            y: viewport.y.clamp(min_screen_y, max_screen_y),
-            zoom: viewport.zoom,
+            x: clamp_axis(min_x, max_x, viewport.x, width),
+            y: clamp_axis(min_y, max_y, viewport.y, height),
+            zoom,
         }
     }
 
@@ -757,40 +990,6 @@ where
     }
 }
 
-/// Get bounds of a set of nodes
-pub fn get_nodes_bounds<N: Clone + PartialEq + Default>(nodes: &[Node<N>]) -> Rect {
-    if nodes.is_empty() {
-        return Rect::default();
-    }
-
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
-
-    for node in nodes {
-        if node.hidden {
-            continue;
-        }
-        let dims = node.get_dimensions();
-        min_x = min_x.min(node.position.x);
-        min_y = min_y.min(node.position.y);
-        max_x = max_x.max(node.position.x + dims.width);
-        max_y = max_y.max(node.position.y + dims.height);
-    }
-
-    if min_x == f64::MAX {
-        return Rect::default();
-    }
-
-    Rect {
-        x: min_x,
-        y: min_y,
-        width: max_x - min_x,
-        height: max_y - min_y,
-    }
-}
-
 /// Node ID context for child components
 #[derive(Clone, PartialEq)]
 pub struct NodeIdContext(pub String);
@@ -801,36 +1000,13 @@ pub struct NodeDragState {
     pub origin_node_id: String,
     pub start_pointer: XYPosition,
     pub nodes: Vec<(String, XYPosition)>,
+    pub started: bool,
 }
 
-/// Get incomers (nodes that connect to the given node)
-pub fn get_incomers<N, E>(node: &Node<N>, nodes: &[Node<N>], edges: &[Edge<E>]) -> Vec<Node<N>>
-where
-    N: Clone + PartialEq + Default,
-    E: Clone + PartialEq + Default,
-{
-    let incoming_edges: Vec<_> = edges.iter().filter(|e| e.target == node.id).collect();
-
-    incoming_edges
-        .iter()
-        .filter_map(|edge| nodes.iter().find(|n| n.id == edge.source))
-        .cloned()
-        .collect()
-}
-
-/// Get outgoers (nodes that the given node connects to)
-pub fn get_outgoers<N, E>(node: &Node<N>, nodes: &[Node<N>], edges: &[Edge<E>]) -> Vec<Node<N>>
-where
-    N: Clone + PartialEq + Default,
-    E: Clone + PartialEq + Default,
-{
-    let outgoing_edges: Vec<_> = edges.iter().filter(|e| e.source == node.id).collect();
-
-    outgoing_edges
-        .iter()
-        .filter_map(|edge| nodes.iter().find(|n| n.id == edge.target))
-        .cloned()
-        .collect()
+#[derive(Clone, PartialEq, Debug)]
+pub struct PendingNodeClick {
+    pub node_id: String,
+    pub multi: bool,
 }
 
 /// Get all edges connected to a set of nodes
@@ -867,25 +1043,6 @@ fn filter_fit_view_nodes<N: Clone + PartialEq + Default>(
     }
 
     filtered
-}
-
-/// Add edge with duplicate check
-pub fn add_edge<E: Clone + PartialEq + Default>(
-    edge: Edge<E>,
-    mut edges: Vec<Edge<E>>,
-) -> Vec<Edge<E>> {
-    let exists = edges.iter().any(|e| {
-        e.source == edge.source
-            && e.target == edge.target
-            && e.source_handle == edge.source_handle
-            && e.target_handle == edge.target_handle
-    });
-
-    if !exists {
-        edges.push(edge);
-    }
-
-    edges
 }
 
 /// Create an edge from a connection

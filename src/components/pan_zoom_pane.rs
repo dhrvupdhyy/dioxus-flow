@@ -11,7 +11,10 @@ use dioxus::prelude::*;
 use dioxus::prelude::{
     InteractionLocation, ModifiersInteraction, PointerInteraction, ReadableExt, WritableExt,
 };
-use std::collections::HashMap;
+use dioxus_web::WebEventExt;
+use wasm_bindgen::JsCast;
+use std::collections::{HashMap, HashSet};
+use web_sys::console;
 
 #[derive(Clone, PartialEq)]
 struct PinchState {
@@ -45,6 +48,10 @@ pub fn PanZoomPane<
     #[props(default)] on_edge_update_end: Option<EventHandler<crate::types::EdgeUpdateEndEvent<E>>>,
     #[props(default)] on_node_drag: Option<EventHandler<crate::types::NodeDragEvent<N>>>,
     #[props(default)] on_node_drag_stop: Option<EventHandler<crate::types::NodeDragEvent<N>>>,
+    #[props(default)] on_selection_start: Option<EventHandler<crate::types::SelectionStartEvent>>,
+    #[props(default)] on_selection_end: Option<
+        EventHandler<crate::types::SelectionEndEvent<N, E>>,
+    >,
     #[props(default)] _marker: std::marker::PhantomData<(N, E)>,
 ) -> Element {
     let state = use_context::<FlowState<N, E>>();
@@ -55,6 +62,7 @@ pub fn PanZoomPane<
     let mut initialized_size = use_signal(|| false);
     let mut active_pointers = use_signal(HashMap::<i32, XYPosition>::new);
     let mut pinch_state = use_signal(|| None::<PinchState>);
+    let mut pane_rect = use_signal(|| None::<web_sys::DomRect>);
 
     let mut state_size = state.clone();
     use_effect(move || {
@@ -78,12 +86,31 @@ pub fn PanZoomPane<
 
     let mut state_down = state.clone();
     let on_pointer_down = move |evt: PointerEvent| {
-        if !*state_down.pan_on_drag.read() {
-            // allow selection even if panning is disabled
+        if let Some(web_evt) = evt.data.try_as_web_event() {
+            if let Some(target) = web_evt.target().and_then(|t| {
+                let element: Option<web_sys::Element> = t.dyn_into::<web_sys::Element>().ok();
+                element
+            }) {
+            let no_pan_class = state_down.no_pan_class_name.read().clone();
+            if !no_pan_class.is_empty()
+                && target.closest(&format!(".{}", no_pan_class)).ok().flatten().is_some()
+            {
+                return;
+            }
+            }
         }
-        if evt.data.trigger_button() != Some(MouseButton::Primary) {
-            return;
-        }
+        let trigger_button = evt.data.trigger_button();
+        let is_primary = trigger_button == Some(MouseButton::Primary);
+        let button_code = trigger_button
+            .map(|b| match b {
+                MouseButton::Primary => 0,
+                MouseButton::Auxiliary => 1,
+                MouseButton::Secondary => 2,
+                MouseButton::Fourth => 3,
+                MouseButton::Fifth => 4,
+                MouseButton::Unknown => 0,
+            })
+            .unwrap_or(0);
         let modifiers = evt.data.modifiers();
         if evt.data.pointer_type() == "touch" && *state_down.zoom_on_pinch.read() {
             let pointer_id = evt.data.pointer_id();
@@ -104,10 +131,12 @@ pub fn PanZoomPane<
         let coords = evt.data.client_coordinates();
         let flow_pos = state_down.screen_to_flow_position(XYPosition::new(coords.x, coords.y));
 
-        let selection_enabled = *state_down.selection_on_drag.read()
+        let selection_enabled = is_primary
+            && (*state_down.selection_on_drag.read()
             || *state_down.selection_key_pressed.read()
-            || modifiers.shift();
-        if selection_enabled {
+            || modifiers.shift())
+            && !*state_down.pan_activation_key_pressed.read();
+        if selection_enabled && *state_down.elements_selectable.read() {
             selection_start.set(Some(flow_pos));
             selection_additive.set(
                 *state_down.multi_selection_key_pressed.read()
@@ -125,14 +154,28 @@ pub fn PanZoomPane<
             state_down
                 .multi_selection_active
                 .set(*selection_additive.read());
+            if let Some(handler) = &on_selection_start {
+                handler.call(crate::types::SelectionStartEvent {
+                    position: flow_pos,
+                });
+            }
+            if *state_down.debug.read() {
+                console::log_1(&"selection start".into());
+            }
             return;
         }
 
-        if *state_down.elements_selectable.read() {
+        if is_primary && *state_down.elements_selectable.read() {
             state_down.deselect_all();
         }
 
-        if !*state_down.pan_on_drag.read() {
+        let mut allow_pan = *state_down.pan_on_drag.read()
+            || *state_down.pan_activation_key_pressed.read();
+        if let Some(buttons) = state_down.pan_on_drag_buttons.read().clone() {
+            allow_pan = allow_pan && buttons.contains(&button_code);
+        }
+
+        if !allow_pan {
             return;
         }
 
@@ -183,7 +226,7 @@ pub fn PanZoomPane<
                                 zoom,
                             };
                             let clamped = state_move.clamp_viewport(next);
-                            state_move.viewport.set(clamped);
+                            state_move.set_viewport(clamped, None);
                             refresh_connection_position(&mut state_move);
                         }
                     }
@@ -197,40 +240,64 @@ pub fn PanZoomPane<
             let screen_pos = XYPosition::new(coords.x, coords.y);
             let flow_pos = state_move.screen_to_flow_position(screen_pos);
             let mut connection = state_move.connection.read().clone();
+            let threshold = *state_move.connection_drag_threshold.read();
+            if !connection.dragging {
+                if let Some(start) = connection.start_screen {
+                    if start.distance_to(&screen_pos) < threshold {
+                        return;
+                    }
+                }
+                connection.dragging = true;
+            }
             update_connection_target(&mut state_move, &mut connection, screen_pos, flow_pos);
             state_move.connection.set(connection);
+            if *state_move.auto_pan_on_connect.read() {
+                if let Some(rect) = pane_rect.read().as_ref() {
+                    auto_pan_if_needed(&mut state_move, screen_pos, rect);
+                }
+            }
             return;
         }
 
         let drag_state = state_move.node_drag.read().clone();
-        if let Some(drag_state) = drag_state {
+        if let Some(mut drag_state) = drag_state {
             let coords = evt.data.client_coordinates();
             let flow_pos = state_move.screen_to_flow_position(XYPosition::new(coords.x, coords.y));
             let delta = XYPosition {
                 x: flow_pos.x - drag_state.start_pointer.x,
                 y: flow_pos.y - drag_state.start_pointer.y,
             };
+            let threshold = *state_move.node_drag_threshold.read();
+            if !drag_state.started && delta.distance_to(&XYPosition::new(0.0, 0.0)) < threshold {
+                return;
+            }
+            if !drag_state.started {
+                drag_state.started = true;
+                state_move.node_drag.set(Some(drag_state.clone()));
+            }
             let mut changes = Vec::new();
             let snap = *state_move.snap_to_grid.read();
             let grid = *state_move.snap_grid.read();
-
-            for (node_id, start_pos) in drag_state.nodes.iter() {
-                let mut next = XYPosition {
-                    x: start_pos.x + delta.x,
-                    y: start_pos.y + delta.y,
-                };
-                if snap {
-                    next.x = (next.x / grid.0).round() * grid.0;
-                    next.y = (next.y / grid.1).round() * grid.1;
+            {
+                let node_lookup = state_move.node_lookup.read();
+                for (node_id, start_pos) in drag_state.nodes.iter() {
+                    let mut next = XYPosition {
+                        x: start_pos.x + delta.x,
+                        y: start_pos.y + delta.y,
+                    };
+                    if snap {
+                        next.x = (next.x / grid.0).round() * grid.0;
+                        next.y = (next.y / grid.1).round() * grid.1;
+                    }
+                    if let Some(internal) = node_lookup.get(node_id) {
+                        next = clamp_node_position(&state_move, internal, next);
+                    }
+                    changes.push(crate::types::NodeChange::Position {
+                        id: node_id.clone(),
+                        position: Some(next),
+                        dragging: true,
+                    });
                 }
-                if let Some(internal) = state_move.node_lookup.read().get(node_id).cloned() {
-                    next = clamp_node_position(&state_move, &internal, next);
-                }
-                changes.push(crate::types::NodeChange::Position {
-                    id: node_id.clone(),
-                    position: Some(next),
-                    dragging: true,
-                });
             }
 
             let next_nodes =
@@ -248,6 +315,12 @@ pub fn PanZoomPane<
                             nodes: next_nodes,
                         });
                     }
+                }
+            }
+            if *state_move.auto_pan_on_node_drag.read() {
+                let screen_pos = XYPosition::new(coords.x, coords.y);
+                if let Some(rect) = pane_rect.read().as_ref() {
+                    auto_pan_if_needed(&mut state_move, screen_pos, rect);
                 }
             }
             return;
@@ -285,7 +358,7 @@ pub fn PanZoomPane<
                 y: base.y + dy,
                 zoom: base.zoom,
             };
-            state_move.viewport.set(next);
+            state_move.set_viewport(next, None);
             refresh_connection_position(&mut state_move);
             if let Some(handler) = &on_move {
                 handler.call(next);
@@ -314,6 +387,7 @@ pub fn PanZoomPane<
             &on_edge_update,
             &on_edge_update_end,
             &on_node_drag_stop,
+            &on_selection_end,
             &mut pan_start_up,
             &mut selection_start_up,
             &mut selection_additive_up,
@@ -341,6 +415,7 @@ pub fn PanZoomPane<
             &on_edge_update,
             &on_edge_update_end,
             &on_node_drag_stop,
+            &on_selection_end,
             &mut pan_start_leave,
             &mut selection_start_leave,
             &mut selection_additive_leave,
@@ -349,6 +424,22 @@ pub fn PanZoomPane<
 
     let mut state_wheel = state.clone();
     let on_wheel = move |evt: WheelEvent| {
+        if let Some(web_evt) = evt.data.try_as_web_event() {
+            if let Some(target) = web_evt.target().and_then(|t| {
+                let element: Option<web_sys::Element> = t.dyn_into::<web_sys::Element>().ok();
+                element
+            }) {
+                let no_wheel_class = state_wheel.no_wheel_class_name.read().clone();
+                if !no_wheel_class.is_empty()
+                    && target.closest(&format!(".{}", no_wheel_class)).ok().flatten().is_some()
+                {
+                    if evt.data.modifiers().ctrl() {
+                        evt.prevent_default();
+                    }
+                    return;
+                }
+            }
+        }
         let (delta_x, delta_y) = match evt.data.delta() {
             WheelDelta::Pixels(v) => (v.x, v.y),
             WheelDelta::Lines(v) => (v.x * 16.0, v.y * 16.0),
@@ -363,8 +454,23 @@ pub fn PanZoomPane<
         let coords = evt.data.client_coordinates();
         let modifiers = evt.data.modifiers();
 
-        if *state_wheel.pan_on_scroll.read() && !*state_wheel.zoom_on_scroll.read() {
-            let (mut dx, mut dy) = (-delta_x, -delta_y);
+        let zoom_key = *state_wheel.zoom_activation_key_pressed.read();
+        let pan_key = *state_wheel.pan_activation_key_pressed.read();
+        let zoom_on_scroll = *state_wheel.zoom_on_scroll.read() || zoom_key;
+        let is_pan_on_scroll = *state_wheel.pan_on_scroll.read()
+            && !zoom_key
+            && !*state_wheel.user_selection_active.read();
+
+        if *state_wheel.prevent_scrolling.read() || zoom_on_scroll || is_pan_on_scroll || pan_key {
+            evt.prevent_default();
+        } else if !modifiers.ctrl() {
+            return;
+        }
+
+        if is_pan_on_scroll && !zoom_on_scroll {
+            let zoom = state_wheel.viewport.read().zoom.max(0.0001);
+            let speed = *state_wheel.pan_on_scroll_speed.read();
+            let (mut dx, mut dy) = (-delta_x / zoom * speed, -delta_y / zoom * speed);
             match *state_wheel.pan_on_scroll_mode.read() {
                 crate::types::PanOnScrollMode::Horizontal => dy = 0.0,
                 crate::types::PanOnScrollMode::Vertical => dx = 0.0,
@@ -379,7 +485,7 @@ pub fn PanZoomPane<
             return;
         }
 
-        if !*state_wheel.zoom_on_scroll.read() {
+        if !zoom_on_scroll {
             return;
         }
 
@@ -397,11 +503,12 @@ pub fn PanZoomPane<
     };
 
     let mut state_double = state.clone();
-    let on_double_click = move |_evt: MouseEvent| {
+    let on_double_click = move |evt: MouseEvent| {
         if !*state_double.zoom_on_double_click.read() {
             return;
         }
-        state_double.zoom_in(Some(1.2));
+        let coords = evt.data.client_coordinates();
+        zoom_at_point(&mut state_double, coords.x, coords.y, 1.2);
         let viewport = *state_double.viewport.read();
         if let Some(handler) = &on_move {
             handler.call(viewport);
@@ -417,6 +524,11 @@ pub fn PanZoomPane<
             onpointerleave: on_pointer_leave,
             onwheel: on_wheel,
             ondoubleclick: on_double_click,
+            onmounted: move |evt| {
+                let element: web_sys::Element = evt.as_web_event();
+                let rect = element.get_bounding_client_rect();
+                pane_rect.set(Some(rect));
+            },
             {children}
         }
     }
@@ -494,6 +606,7 @@ fn end_interaction<
     on_edge_update: &Option<EventHandler<crate::types::EdgeUpdateEvent<E>>>,
     on_edge_update_end: &Option<EventHandler<crate::types::EdgeUpdateEndEvent<E>>>,
     on_node_drag_stop: &Option<EventHandler<crate::types::NodeDragEvent<N>>>,
+    on_selection_end: &Option<EventHandler<crate::types::SelectionEndEvent<N, E>>>,
     pan_start: &mut Signal<Option<(f64, f64)>>,
     selection_start: &mut Signal<Option<XYPosition>>,
     selection_additive: &mut Signal<bool>,
@@ -510,6 +623,12 @@ fn end_interaction<
         let edge_before = reconnect_edge
             .as_ref()
             .and_then(|id| state.edge_lookup.read().get(id).cloned());
+        if let Some(handler) = state.on_connect_end.read().clone() {
+            handler.call(crate::types::ConnectionEndEvent {
+                connection: result.clone(),
+                is_valid: connection.is_valid,
+            });
+        }
         connection.reset();
         state.connection.set(connection);
 
@@ -568,6 +687,50 @@ fn end_interaction<
         }
     }
     let drag_state = state.node_drag.read().clone();
+    let pending_click = state.pending_node_click.read().as_ref().cloned();
+    if let Some(pending) = pending_click {
+        let allow_apply = match &drag_state {
+            Some(drag) => !drag.started,
+            None => true,
+        };
+        if allow_apply {
+            let nodes = state.nodes.read().clone();
+            let mut changes = Vec::new();
+
+            if pending.multi {
+                if let Some(node) = nodes.iter().find(|n| n.id == pending.node_id) {
+                    let next = !node.selected;
+                    changes.push(crate::types::NodeChange::Selection {
+                        id: node.id.clone(),
+                        selected: next,
+                    });
+                }
+            } else {
+                for node in nodes.iter() {
+                    let should_select = node.id == pending.node_id;
+                    if node.selected != should_select {
+                        changes.push(crate::types::NodeChange::Selection {
+                            id: node.id.clone(),
+                            selected: should_select,
+                        });
+                    }
+                }
+                let edge_changes: Vec<_> = state
+                    .edges
+                    .read()
+                    .iter()
+                    .filter(|edge| edge.selected)
+                    .map(|edge| crate::types::EdgeChange::Selection {
+                        id: edge.id.clone(),
+                        selected: false,
+                    })
+                    .collect();
+                apply_edge_changes(state, on_edges_change, edge_changes);
+            }
+            apply_node_changes(state, on_nodes_change, changes);
+        }
+        state.pending_node_click.set(None);
+    }
     if let Some(drag_state) = drag_state {
         let mut changes = Vec::new();
         for (node_id, _) in drag_state.nodes.iter() {
@@ -599,23 +762,36 @@ fn end_interaction<
         let nodes = state.nodes.read().clone();
         if let Some(rect) = selection {
             let selection_mode = *state.selection_mode.read();
-            let mut selected_ids = Vec::new();
-            for node in nodes.iter() {
-                let dims = node.get_dimensions();
-                let node_rect = Rect {
-                    x: node.position.x,
-                    y: node.position.y,
-                    width: dims.width,
-                    height: dims.height,
-                };
-                let is_selected = match selection_mode {
-                    SelectionMode::Full => rect.contains_rect(&node_rect),
-                    SelectionMode::Partial => rect.intersects(&node_rect),
-                };
-                if is_selected {
-                    selected_ids.push(node.id.clone());
+            let selected_ids = {
+                let internal_lookup = state.node_lookup.read();
+                let mut selected_ids = HashSet::new();
+                for node in nodes.iter() {
+                    if node.hidden || !node.selectable.unwrap_or(true) {
+                        continue;
+                    }
+                    let internal = internal_lookup.get(&node.id);
+                    let dims = internal
+                        .map(|i| i.dimensions)
+                        .unwrap_or_else(|| node.get_dimensions());
+                    let position = internal
+                        .map(|i| i.position_absolute)
+                        .unwrap_or(node.position);
+                    let node_rect = Rect {
+                        x: position.x,
+                        y: position.y,
+                        width: dims.width,
+                        height: dims.height,
+                    };
+                    let is_selected = match selection_mode {
+                        SelectionMode::Full => rect.contains_rect(&node_rect),
+                        SelectionMode::Partial => rect.intersects(&node_rect),
+                    };
+                    if is_selected {
+                        selected_ids.insert(node.id.clone());
+                    }
                 }
-            }
+                selected_ids
+            };
 
             let additive = *selection_additive.read();
             let mut changes = Vec::new();
@@ -631,7 +807,35 @@ fn end_interaction<
                     });
                 }
             }
+            let next_nodes_for_event = if on_selection_end.is_some() {
+                Some(crate::types::apply_node_changes(changes.clone(), nodes.clone()))
+            } else {
+                None
+            };
             apply_node_changes(state, on_nodes_change, changes);
+            if let Some(handler) = on_selection_end {
+                let next_nodes = next_nodes_for_event.unwrap_or_else(|| state.nodes.read().clone());
+                let selected_nodes = next_nodes
+                    .iter()
+                    .filter(|n| n.selected)
+                    .cloned()
+                    .collect();
+                let selected_edges = state
+                    .edges
+                    .read()
+                    .iter()
+                    .filter(|e| e.selected)
+                    .cloned()
+                    .collect();
+                handler.call(crate::types::SelectionEndEvent {
+                    selection_rect: Some(rect),
+                    nodes: selected_nodes,
+                    edges: selected_edges,
+                });
+            }
+            if *state.debug.read() {
+                console::log_1(&"selection end".into());
+            }
         }
 
         state.user_selection_active.set(false);
@@ -759,7 +963,7 @@ fn zoom_at_point<
         y: next_y,
         zoom: next_zoom,
     });
-    state.viewport.set(clamped);
+    state.set_viewport(clamped, None);
 }
 
 #[derive(Clone)]
@@ -893,13 +1097,35 @@ fn refresh_connection_position<
 >(
     state: &mut FlowState<N, E>,
 ) {
-    if !state.connection.read().in_progress {
-        return;
+    state.refresh_connection_position();
+}
+
+fn auto_pan_if_needed<
+    N: Clone + PartialEq + Default + 'static,
+    E: Clone + PartialEq + Default + 'static,
+>(
+    state: &mut FlowState<N, E>,
+    screen_pos: XYPosition,
+    rect: &web_sys::DomRect,
+) {
+    let margin = 40.0;
+    let speed = *state.auto_pan_speed.read();
+    let mut dx = 0.0;
+    let mut dy = 0.0;
+
+    if screen_pos.x - rect.x() < margin {
+        dx = speed;
+    } else if rect.x() + rect.width() - screen_pos.x < margin {
+        dx = -speed;
     }
-    let mut connection = state.connection.read().clone();
-    if let Some(screen_pos) = connection.to_position_screen {
-        let flow_pos = state.screen_to_flow_position(screen_pos);
-        connection.update_screen_position(screen_pos, flow_pos);
-        state.connection.set(connection);
+
+    if screen_pos.y - rect.y() < margin {
+        dy = speed;
+    } else if rect.y() + rect.height() - screen_pos.y < margin {
+        dy = -speed;
+    }
+
+    if dx != 0.0 || dy != 0.0 {
+        state.pan_by(XYPosition { x: dx, y: dy });
     }
 }

@@ -5,6 +5,7 @@ use crate::types::{ConnectionMode, HandleType, Position, XYPosition};
 use dioxus::prelude::dioxus_elements::input_data::MouseButton;
 use dioxus::prelude::*;
 use dioxus::prelude::{PointerInteraction, ReadableExt, WritableExt};
+use web_sys::console;
 
 #[component]
 pub fn Handle<
@@ -18,7 +19,7 @@ pub fn Handle<
     #[props(default = true)] is_connectable: bool,
     #[props(default)] _marker: std::marker::PhantomData<(N, E)>,
 ) -> Element {
-    let mut state = use_context::<FlowState<N, E>>();
+    let state = use_context::<FlowState<N, E>>();
     let position_class = match position {
         Position::Left => "dioxus-flow__handle-left",
         Position::Right => "dioxus-flow__handle-right",
@@ -36,7 +37,7 @@ pub fn Handle<
         position_class, handle_type_class
     );
     if is_connectable {
-        class.push_str(" connectable");
+        class.push_str(" connectable connectablestart connectableend");
     }
 
     let connection = state.connection.read().clone();
@@ -59,6 +60,20 @@ pub fn Handle<
                 class.push_str(" invalid");
             }
         }
+        if connection.from_type.is_some() {
+            let is_possible_end = match *state.connection_mode.read() {
+                ConnectionMode::Strict => connection.from_type != Some(handle_type),
+                ConnectionMode::Loose => {
+                    connection.from_node.as_deref() != Some(&node_id)
+                        || connection.from_handle.as_deref() != id.as_deref()
+                }
+            };
+            if is_possible_end {
+                class.push_str(" connectionindicator");
+            }
+        }
+    } else if is_connectable {
+        class.push_str(" connectionindicator");
     }
 
     let node_id_attr = node_id.clone();
@@ -74,14 +89,71 @@ pub fn Handle<
             return;
         }
         evt.stop_propagation();
-        state_down
-            .connection
-            .set(crate::types::ConnectionState::start(
+
+        let mut connection = state_down.connection.read().clone();
+        if connection.in_progress && *state_down.connect_on_click.read() {
+            let base_valid = match *state_down.connection_mode.read() {
+                ConnectionMode::Strict => match connection.from_type {
+                    Some(from_type) => from_type != handle_type,
+                    None => false,
+                },
+                ConnectionMode::Loose => true,
+            };
+            connection.set_target(
                 node_id_down.clone(),
                 handle_id_down.clone(),
                 handle_type,
+                base_valid,
+            );
+            let is_valid = if base_valid {
+                if let Some(conn) = connection.to_connection() {
+                    if let Some(validator) = *state_down.is_valid_connection.read() {
+                        validator(&conn)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+        connection.is_valid = is_valid;
+            if let Some(flow_pos) = resolve_handle_flow_position(
+                &state_down,
+                &node_id_down,
+                handle_type,
+                handle_id_down.as_deref(),
                 position,
-            ));
+            ) {
+                let screen_pos = state_down.flow_to_screen_position(flow_pos);
+                connection.update_screen_position(screen_pos, flow_pos);
+            }
+            state_down.connection.set(connection);
+            return;
+        }
+        let coords = evt.data.client_coordinates();
+        let mut connection = crate::types::ConnectionState::start(
+            node_id_down.clone(),
+            handle_id_down.clone(),
+            handle_type,
+            position,
+        );
+        connection.start_screen = Some(XYPosition::new(coords.x, coords.y));
+        state_down.connection.set(connection);
+        if *state_down.debug.read() {
+            console::log_1(
+                &format!("connect start: {} {:?}", node_id_down, handle_id_down).into(),
+            );
+        }
+        if let Some(handler) = state_down.on_connect_start.read().clone() {
+            handler.call(crate::types::ConnectionStartEvent {
+                node_id: node_id_down.clone(),
+                handle_id: handle_id_down.clone(),
+                handle_type,
+                position,
+            });
+        }
     };
 
     let node_id_enter = node_id.clone();
@@ -122,9 +194,13 @@ pub fn Handle<
             false
         };
         connection.is_valid = is_valid;
-        if let Some(node) = state_enter.node_lookup.read().get(&node_id_enter) {
-            let (x, y) = node_handle_position_internal(node, position);
-            let flow_pos = XYPosition::new(x, y);
+        if let Some(flow_pos) = resolve_handle_flow_position(
+            &state_enter,
+            &node_id_enter,
+            handle_type,
+            handle_id_enter.as_deref(),
+            position,
+        ) {
             let screen_pos = state_enter.flow_to_screen_position(flow_pos);
             connection.update_screen_position(screen_pos, flow_pos);
         }
@@ -162,7 +238,8 @@ pub fn Handle<
             class: "{class}",
             "data-node-id": "{node_id_attr}",
             "data-handle-id": "{handle_id_attr.clone().unwrap_or_default()}",
-            aria_label: "{aria_label}",
+            "data-handle-pos": "{position:?}",
+            "aria-label": "{aria_label}",
             onpointerdown: on_pointer_down,
             onpointerenter: on_pointer_enter,
             onpointerleave: on_pointer_leave,
@@ -183,4 +260,37 @@ fn node_handle_position_internal<N: Clone + PartialEq + Default>(
         Position::Top => (base.x + dims.width / 2.0, base.y),
         Position::Bottom => (base.x + dims.width / 2.0, base.y + dims.height),
     }
+}
+
+fn resolve_handle_flow_position<
+    N: Clone + PartialEq + Default + 'static,
+    E: Clone + PartialEq + Default + 'static,
+>(
+    state: &FlowState<N, E>,
+    node_id: &str,
+    handle_type: HandleType,
+    handle_id: Option<&str>,
+    fallback_position: Position,
+) -> Option<XYPosition> {
+    let lookup = state.node_lookup.read();
+    let internal = lookup.get(node_id)?;
+    if let Some(bounds) = &internal.handle_bounds {
+        let handles = match handle_type {
+            HandleType::Source => &bounds.source,
+            HandleType::Target => &bounds.target,
+        };
+        let handle = if let Some(id) = handle_id {
+            handles.iter().find(|handle| handle.id.as_deref() == Some(id))
+        } else {
+            handles.first()
+        };
+        if let Some(handle) = handle {
+            return Some(XYPosition::new(
+                internal.position_absolute.x + handle.x + handle.width / 2.0,
+                internal.position_absolute.y + handle.y + handle.height / 2.0,
+            ));
+        }
+    }
+    let (x, y) = node_handle_position_internal(internal, fallback_position);
+    Some(XYPosition::new(x, y))
 }

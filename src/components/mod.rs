@@ -1,6 +1,7 @@
 //! Dioxus Flow components
 
 mod background;
+mod attribution;
 mod base_edge;
 mod controls;
 mod dioxus_flow;
@@ -21,6 +22,7 @@ mod selection_listener;
 mod store_updater;
 
 pub use background::*;
+pub use attribution::*;
 pub use base_edge::*;
 pub use controls::*;
 pub use dioxus_flow::*;

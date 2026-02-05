@@ -108,15 +108,16 @@ where
     });
 }
 
-pub fn use_nodes_data<N, T>(
+pub fn use_nodes_data<N, E, T>(
     node_ids: impl IntoIterator<Item = String>,
     selector: impl Fn(&Node<N>) -> T + 'static,
 ) -> Vec<T>
 where
     N: Clone + PartialEq + Default + 'static,
+    E: Clone + PartialEq + Default + 'static,
     T: Clone + PartialEq + 'static,
 {
-    let state = use_context::<FlowState<N, ()>>();
+    let state = use_context::<FlowState<N, E>>();
     let node_ids: Vec<String> = node_ids.into_iter().collect();
 
     let memo: Memo<Vec<T>> = use_memo(move || {

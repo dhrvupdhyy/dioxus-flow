@@ -91,6 +91,10 @@ pub struct ConnectionState {
     pub reconnect_end: Option<HandleType>,
     /// Whether the current target is valid
     pub is_valid: bool,
+    /// Whether the user has dragged far enough to start a connection
+    pub dragging: bool,
+    /// Initial screen position for drag threshold checks
+    pub start_screen: Option<XYPosition>,
 }
 
 impl ConnectionState {
@@ -114,6 +118,8 @@ impl ConnectionState {
             reconnect_edge_id: None,
             reconnect_end: None,
             is_valid: false,
+            dragging: false,
+            start_screen: None,
         }
     }
 
@@ -139,6 +145,8 @@ impl ConnectionState {
             reconnect_edge_id: Some(edge_id),
             reconnect_end: Some(reconnect_end),
             is_valid: false,
+            dragging: false,
+            start_screen: None,
         }
     }
 

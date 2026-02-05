@@ -9,9 +9,12 @@ use crate::types::{
 use dioxus::prelude::*;
 use dioxus::prelude::{ReadableExt, WritableExt};
 use std::collections::HashMap;
+use js_sys::Function;
+use js_sys::Reflect;
 use std::rc::Rc;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
+use wasm_bindgen::closure::Closure;
 
 #[component]
 pub fn DioxusFlow<
@@ -44,17 +47,36 @@ pub fn DioxusFlow<
     #[props(default = 0.5)] min_zoom: f64,
     #[props(default = 2.0)] max_zoom: f64,
     #[props(default)] default_viewport: Option<Viewport>,
+    #[props(default)] viewport: Option<Signal<Viewport>>,
+    #[props(default)] on_viewport_change: Option<EventHandler<Viewport>>,
     #[props(default)] translate_extent: Option<CoordinateExtent>,
+    #[props(default = (0.0, 0.0))] node_origin: crate::types::NodeOrigin,
+    #[props(default = false)] fit_view: bool,
+    #[props(default)] fit_view_options: Option<crate::types::FitViewOptions>,
     #[props(default = true)] zoom_on_scroll: bool,
     #[props(default = true)] zoom_on_pinch: bool,
     #[props(default = true)] zoom_on_double_click: bool,
     #[props(default = true)] pan_on_drag: bool,
+    #[props(default)] pan_on_drag_buttons: Option<Vec<i32>>,
     #[props(default)] pan_on_scroll: bool,
+    #[props(default = 0.5)] pan_on_scroll_speed: f64,
     #[props(default = PanOnScrollMode::Free)] pan_on_scroll_mode: PanOnScrollMode,
+    #[props(default = true)] prevent_scrolling: bool,
+    #[props(default)] pan_activation_key_code: Option<Vec<String>>,
+    #[props(default)] zoom_activation_key_code: Option<Vec<String>>,
+    #[props(default = true)] auto_pan_on_node_drag: bool,
+    #[props(default = true)] auto_pan_on_connect: bool,
+    #[props(default = 15.0)] auto_pan_speed: f64,
+    #[props(default = true)] auto_pan_on_node_focus: bool,
     #[props(default = true)] nodes_draggable: bool,
+    #[props(default = false)] snap_to_grid: bool,
+    #[props(default = (15.0, 15.0))] snap_grid: (f64, f64),
     #[props(default = true)] nodes_connectable: bool,
     #[props(default = true)] nodes_focusable: bool,
+    #[props(default = true)] edges_focusable: bool,
+    #[props(default = true)] edges_reconnectable: bool,
     #[props(default = true)] elements_selectable: bool,
+    #[props(default = true)] select_nodes_on_drag: bool,
     #[props(default = false)] only_render_visible_elements: bool,
     #[props(default = 0.2)] visible_area_padding: f64,
     #[props(default = false)] selection_on_drag: bool,
@@ -68,9 +90,46 @@ pub fn DioxusFlow<
     #[props(default)] connection_line_style: Option<String>,
     #[props(default)] is_valid_connection: Option<crate::types::IsValidConnection>,
     #[props(default = 20.0)] connection_radius: f64,
+    #[props(default = 10.0)] reconnect_radius: f64,
+    #[props(default = 1.0)] node_drag_threshold: f64,
+    #[props(default = 1.0)] connection_drag_threshold: f64,
+    #[props(default = true)] connect_on_click: bool,
+    #[props(default)] default_marker_color: Option<String>,
+    #[props(default = "nodrag".to_string())] no_drag_class_name: String,
+    #[props(default = "nowheel".to_string())] no_wheel_class_name: String,
+    #[props(default = "nopan".to_string())] no_pan_class_name: String,
     #[props(default)] delete_key_code: Option<Vec<String>>,
     #[props(default)] selection_key_code: Option<Vec<String>>,
     #[props(default)] multi_selection_key_code: Option<Vec<String>>,
+    #[props(default = true)] elevate_nodes_on_select: bool,
+    #[props(default = false)] elevate_edges_on_select: bool,
+    #[props(default = crate::types::ZIndexMode::Basic)] z_index_mode: crate::types::ZIndexMode,
+    #[props(default = false)] disable_keyboard_a11y: bool,
+    #[props(default)] width: Option<f64>,
+    #[props(default)] height: Option<f64>,
+    #[props(default = crate::types::ColorMode::Light)] color_mode: crate::types::ColorMode,
+    #[props(default = false)] debug: bool,
+    #[props(default)] aria_label_config: Option<crate::types::AriaLabelConfig>,
+    #[props(default)] attribution_position: Option<String>,
+    #[props(default)] pro_options: Option<crate::types::ProOptions>,
+    #[props(default)] on_connect_start: Option<EventHandler<crate::types::ConnectionStartEvent>>,
+    #[props(default)] on_connect_end: Option<EventHandler<crate::types::ConnectionEndEvent>>,
+    #[props(default)] on_selection_start: Option<EventHandler<crate::types::SelectionStartEvent>>,
+    #[props(default)] on_selection_end: Option<
+        EventHandler<crate::types::SelectionEndEvent<N, E>>,
+    >,
+    #[props(default)] on_nodes_delete: Option<EventHandler<Vec<Node<N>>>>,
+    #[props(default)] on_edges_delete: Option<EventHandler<Vec<Edge<E>>>>,
+    #[props(default)] on_before_delete: Option<crate::types::OnBeforeDelete<N, E>>,
+    #[props(default)] on_node_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_double_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_enter: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_leave: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_edge_click: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_double_click: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_mouse_enter: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_mouse_leave: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_error: Option<crate::types::OnError>,
     #[props(default)] class: Option<String>,
     #[props(default)] style: Option<String>,
 ) -> Element {
@@ -101,17 +160,36 @@ pub fn DioxusFlow<
                 min_zoom,
                 max_zoom,
                 default_viewport,
+                viewport,
+                on_viewport_change,
                 translate_extent,
+                node_origin,
+                fit_view,
+                fit_view_options,
                 zoom_on_scroll,
                 zoom_on_pinch,
                 zoom_on_double_click,
                 pan_on_drag,
+                pan_on_drag_buttons,
                 pan_on_scroll,
+                pan_on_scroll_speed,
                 pan_on_scroll_mode,
+                prevent_scrolling,
+                pan_activation_key_code,
+                zoom_activation_key_code,
+                auto_pan_on_node_drag,
+                auto_pan_on_connect,
+                auto_pan_speed,
+                auto_pan_on_node_focus,
                 nodes_draggable,
+                snap_to_grid,
+                snap_grid,
                 nodes_connectable,
                 nodes_focusable,
+                edges_focusable,
+                edges_reconnectable,
                 elements_selectable,
+                select_nodes_on_drag,
                 only_render_visible_elements,
                 visible_area_padding,
                 selection_on_drag,
@@ -123,9 +201,44 @@ pub fn DioxusFlow<
                 connection_line_style,
                 is_valid_connection,
                 connection_radius,
+                reconnect_radius,
+                node_drag_threshold,
+                connection_drag_threshold,
+                connect_on_click,
+                default_marker_color,
+                no_drag_class_name,
+                no_wheel_class_name,
+                no_pan_class_name,
                 delete_key_code,
                 selection_key_code,
                 multi_selection_key_code,
+                elevate_nodes_on_select,
+                elevate_edges_on_select,
+                z_index_mode,
+                disable_keyboard_a11y,
+                width,
+                height,
+                color_mode,
+                debug,
+                aria_label_config,
+                attribution_position,
+                pro_options,
+                on_connect_start,
+                on_connect_end,
+                on_selection_start,
+                on_selection_end,
+                on_nodes_delete,
+                on_edges_delete,
+                on_before_delete,
+                on_node_click,
+                on_node_double_click,
+                on_node_mouse_enter,
+                on_node_mouse_leave,
+                on_edge_click,
+                on_edge_double_click,
+                on_edge_mouse_enter,
+                on_edge_mouse_leave,
+                on_error,
                 class,
                 style,
                 children,
@@ -160,17 +273,36 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
     #[props(default = 0.5)] min_zoom: f64,
     #[props(default = 2.0)] max_zoom: f64,
     #[props(default)] default_viewport: Option<Viewport>,
+    #[props(default)] viewport: Option<Signal<Viewport>>,
+    #[props(default)] on_viewport_change: Option<EventHandler<Viewport>>,
     #[props(default)] translate_extent: Option<CoordinateExtent>,
+    #[props(default = (0.0, 0.0))] node_origin: crate::types::NodeOrigin,
+    #[props(default = false)] fit_view: bool,
+    #[props(default)] fit_view_options: Option<crate::types::FitViewOptions>,
     #[props(default = true)] zoom_on_scroll: bool,
     #[props(default = true)] zoom_on_pinch: bool,
     #[props(default = true)] zoom_on_double_click: bool,
     #[props(default = true)] pan_on_drag: bool,
+    #[props(default)] pan_on_drag_buttons: Option<Vec<i32>>,
     #[props(default)] pan_on_scroll: bool,
+    #[props(default = 0.5)] pan_on_scroll_speed: f64,
     #[props(default = PanOnScrollMode::Free)] pan_on_scroll_mode: PanOnScrollMode,
+    #[props(default = true)] prevent_scrolling: bool,
+    #[props(default)] pan_activation_key_code: Option<Vec<String>>,
+    #[props(default)] zoom_activation_key_code: Option<Vec<String>>,
+    #[props(default = true)] auto_pan_on_node_drag: bool,
+    #[props(default = true)] auto_pan_on_connect: bool,
+    #[props(default = 15.0)] auto_pan_speed: f64,
+    #[props(default = true)] auto_pan_on_node_focus: bool,
     #[props(default = true)] nodes_draggable: bool,
+    #[props(default = false)] snap_to_grid: bool,
+    #[props(default = (15.0, 15.0))] snap_grid: (f64, f64),
     #[props(default = true)] nodes_connectable: bool,
     #[props(default = true)] nodes_focusable: bool,
+    #[props(default = true)] edges_focusable: bool,
+    #[props(default = true)] edges_reconnectable: bool,
     #[props(default = true)] elements_selectable: bool,
+    #[props(default = true)] select_nodes_on_drag: bool,
     #[props(default = false)] only_render_visible_elements: bool,
     #[props(default = 0.2)] visible_area_padding: f64,
     #[props(default = false)] selection_on_drag: bool,
@@ -184,29 +316,90 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
     #[props(default)] connection_line_style: Option<String>,
     #[props(default)] is_valid_connection: Option<crate::types::IsValidConnection>,
     #[props(default = 20.0)] connection_radius: f64,
+    #[props(default = 10.0)] reconnect_radius: f64,
+    #[props(default = 1.0)] node_drag_threshold: f64,
+    #[props(default = 1.0)] connection_drag_threshold: f64,
+    #[props(default = true)] connect_on_click: bool,
+    #[props(default)] default_marker_color: Option<String>,
+    #[props(default = "nodrag".to_string())] no_drag_class_name: String,
+    #[props(default = "nowheel".to_string())] no_wheel_class_name: String,
+    #[props(default = "nopan".to_string())] no_pan_class_name: String,
     #[props(default)] delete_key_code: Option<Vec<String>>,
     #[props(default)] selection_key_code: Option<Vec<String>>,
     #[props(default)] multi_selection_key_code: Option<Vec<String>>,
+    #[props(default = true)] elevate_nodes_on_select: bool,
+    #[props(default = false)] elevate_edges_on_select: bool,
+    #[props(default = crate::types::ZIndexMode::Basic)] z_index_mode: crate::types::ZIndexMode,
+    #[props(default = false)] disable_keyboard_a11y: bool,
+    #[props(default)] width: Option<f64>,
+    #[props(default)] height: Option<f64>,
+    #[props(default = crate::types::ColorMode::Light)] color_mode: crate::types::ColorMode,
+    #[props(default = false)] debug: bool,
+    #[props(default)] aria_label_config: Option<crate::types::AriaLabelConfig>,
+    #[props(default)] attribution_position: Option<String>,
+    #[props(default)] pro_options: Option<crate::types::ProOptions>,
+    #[props(default)] on_connect_start: Option<EventHandler<crate::types::ConnectionStartEvent>>,
+    #[props(default)] on_connect_end: Option<EventHandler<crate::types::ConnectionEndEvent>>,
+    #[props(default)] on_selection_start: Option<EventHandler<crate::types::SelectionStartEvent>>,
+    #[props(default)] on_selection_end: Option<
+        EventHandler<crate::types::SelectionEndEvent<N, E>>,
+    >,
+    #[props(default)] on_nodes_delete: Option<EventHandler<Vec<Node<N>>>>,
+    #[props(default)] on_edges_delete: Option<EventHandler<Vec<Edge<E>>>>,
+    #[props(default)] on_before_delete: Option<crate::types::OnBeforeDelete<N, E>>,
+    #[props(default)] on_node_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_double_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_enter: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_leave: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_edge_click: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_double_click: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_mouse_enter: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_mouse_leave: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_error: Option<crate::types::OnError>,
     #[props(default)] class: Option<String>,
     #[props(default)] style: Option<String>,
 ) -> Element {
     let state = use_context::<FlowState<N, E>>();
 
     let mut state_config = state.clone();
+    let aria_label_config_state = aria_label_config.clone();
     use_effect(move || {
         state_config.min_zoom.set(min_zoom);
         state_config.max_zoom.set(max_zoom);
         state_config.translate_extent.set(translate_extent);
+        state_config.node_origin.set(node_origin);
+        state_config.color_mode.set(color_mode);
+        state_config.default_marker_color.set(default_marker_color.clone());
+        state_config.z_index_mode.set(z_index_mode);
+        state_config.elevate_nodes_on_select.set(elevate_nodes_on_select);
+        state_config.elevate_edges_on_select.set(elevate_edges_on_select);
+        state_config.disable_keyboard_a11y.set(disable_keyboard_a11y);
+        state_config.debug.set(debug);
+        if let Some(config) = aria_label_config_state.clone() {
+            state_config.aria_label_config.set(config);
+        }
         state_config.zoom_on_scroll.set(zoom_on_scroll);
         state_config.zoom_on_pinch.set(zoom_on_pinch);
         state_config.zoom_on_double_click.set(zoom_on_double_click);
         state_config.pan_on_drag.set(pan_on_drag);
+        state_config.pan_on_drag_buttons.set(pan_on_drag_buttons.clone());
         state_config.pan_on_scroll.set(pan_on_scroll);
+        state_config.pan_on_scroll_speed.set(pan_on_scroll_speed);
         state_config.pan_on_scroll_mode.set(pan_on_scroll_mode);
+        state_config.prevent_scrolling.set(prevent_scrolling);
+        state_config.auto_pan_on_node_drag.set(auto_pan_on_node_drag);
+        state_config.auto_pan_on_connect.set(auto_pan_on_connect);
+        state_config.auto_pan_speed.set(auto_pan_speed);
+        state_config.auto_pan_on_node_focus.set(auto_pan_on_node_focus);
         state_config.nodes_draggable.set(nodes_draggable);
+        state_config.snap_to_grid.set(snap_to_grid);
+        state_config.snap_grid.set(snap_grid);
         state_config.nodes_connectable.set(nodes_connectable);
         state_config.nodes_focusable.set(nodes_focusable);
+        state_config.edges_focusable.set(edges_focusable);
+        state_config.edges_reconnectable.set(edges_reconnectable);
         state_config.elements_selectable.set(elements_selectable);
+        state_config.select_nodes_on_drag.set(select_nodes_on_drag);
         state_config
             .only_render_visible_elements
             .set(only_render_visible_elements);
@@ -228,6 +421,28 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
             .set(connection_line_style.clone());
         state_config.is_valid_connection.set(is_valid_connection);
         state_config.connection_radius.set(connection_radius);
+        state_config.reconnect_radius.set(reconnect_radius);
+        state_config.node_drag_threshold.set(node_drag_threshold);
+        state_config
+            .connection_drag_threshold
+            .set(connection_drag_threshold);
+        state_config.connect_on_click.set(connect_on_click);
+        state_config.no_drag_class_name.set(no_drag_class_name.clone());
+        state_config
+            .no_wheel_class_name
+            .set(no_wheel_class_name.clone());
+        state_config.no_pan_class_name.set(no_pan_class_name.clone());
+        state_config.on_connect_start.set(on_connect_start.clone());
+        state_config.on_connect_end.set(on_connect_end.clone());
+        state_config.on_error.set(on_error);
+        state_config.on_viewport_change.set(on_viewport_change.clone());
+
+        if let Some(width) = width {
+            state_config.width.set(width);
+        }
+        if let Some(height) = height {
+            state_config.height.set(height);
+        }
 
         if let Some(viewport) = default_viewport {
             state_config.viewport.set(viewport);
@@ -248,6 +463,13 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
                 state_sync.set_edges(next_edges);
             }
         }
+        if let Some(viewport_signal) = &viewport {
+            let next_viewport = *viewport_signal.read();
+            if *state_sync.viewport.read() != next_viewport {
+                state_sync.viewport.set(next_viewport);
+                state_sync.refresh_connection_position();
+            }
+        }
     });
 
     let mut init_done = use_signal(|| false);
@@ -261,50 +483,218 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
         }
     });
 
+    let mut fit_done = use_signal(|| false);
+    let mut state_fit = state.clone();
+    let viewport_controlled = viewport.is_some();
+    use_effect(move || {
+        if viewport_controlled || !fit_view || *fit_done.read() {
+            return;
+        }
+        if state_fit.nodes.read().is_empty() {
+            return;
+        }
+        if *state_fit.width.read() <= 0.0 || *state_fit.height.read() <= 0.0 {
+            return;
+        }
+        state_fit.fit_view(fit_view_options.clone());
+        fit_done.set(true);
+    });
+
     let class = class.unwrap_or_default();
-    let style = style.unwrap_or_default();
+    let mut style = style.unwrap_or_default();
+    if let Some(width) = width {
+        style.push_str(&format!(" width: {}px;", width));
+    }
+    if let Some(height) = height {
+        style.push_str(&format!(" height: {}px;", height));
+    }
+
+    let mut is_dark_mode = use_signal(|| matches!(color_mode, crate::types::ColorMode::Dark));
+    use_effect(move || {
+        match color_mode {
+            crate::types::ColorMode::Dark => is_dark_mode.set(true),
+            crate::types::ColorMode::Light => is_dark_mode.set(false),
+            crate::types::ColorMode::System => {
+                if let Some(window) = web_sys::window() {
+                    let func = js_sys::Reflect::get(&window, &JsValue::from_str("matchMedia"))
+                        .ok()
+                        .and_then(|value| value.dyn_into::<js_sys::Function>().ok());
+                    if let Some(func) = func {
+                        if let Ok(result) =
+                            func.call1(&window, &JsValue::from_str("(prefers-color-scheme: dark)"))
+                        {
+                            let matches = js_sys::Reflect::get(
+                                &result,
+                                &JsValue::from_str("matches"),
+                            )
+                            .ok()
+                            .and_then(|value| value.as_bool())
+                            .unwrap_or(false);
+                            is_dark_mode.set(matches);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     let connection_active = state.connection.read().in_progress;
-    let flow_class = if connection_active {
+    let mut flow_class = if connection_active {
         format!("dioxus-flow dioxus-flow--connecting {class}")
     } else {
         format!("dioxus-flow {class}")
     };
+    if *is_dark_mode.read() {
+        flow_class.push_str(" dioxus-flow--dark");
+    }
 
-    let delete_keys =
-        delete_key_code.unwrap_or_else(|| vec!["Backspace".to_string(), "Delete".to_string()]);
+    let delete_keys = if disable_keyboard_a11y {
+        Vec::new()
+    } else {
+        delete_key_code
+            .unwrap_or_else(|| vec!["Backspace".to_string(), "Delete".to_string()])
+    };
     let delete_pressed = crate::hooks::use_key_press_multi(delete_keys);
     let mut delete_latched = use_signal(|| false);
     let mut state_delete = state.clone();
+    let on_nodes_change_delete = on_nodes_change.clone();
+    let on_edges_change_delete = on_edges_change.clone();
     use_effect(move || {
+        if disable_keyboard_a11y {
+            return;
+        }
         let pressed = *delete_pressed.read();
         if pressed && !*delete_latched.read() {
-            state_delete.delete_selected();
+            let selected_nodes: Vec<Node<N>> = state_delete
+                .nodes
+                .read()
+                .iter()
+                .filter(|n| n.selected && n.deletable.unwrap_or(true))
+                .cloned()
+                .collect();
+            let selected_node_ids: std::collections::HashSet<&str> =
+                selected_nodes.iter().map(|n| n.id.as_str()).collect();
+            let mut selected_edge_ids: std::collections::HashSet<String> = state_delete
+                .edges
+                .read()
+                .iter()
+                .filter(|e| e.selected && e.deletable.unwrap_or(true))
+                .map(|e| e.id.clone())
+                .collect();
+            let selected_edges: Vec<Edge<E>> = {
+                let edges = state_delete.edges.read();
+                for edge in edges.iter() {
+                    if selected_node_ids.contains(edge.source.as_str())
+                        || selected_node_ids.contains(edge.target.as_str())
+                    {
+                        selected_edge_ids.insert(edge.id.clone());
+                    }
+                }
+                edges
+                    .iter()
+                    .filter(|e| selected_edge_ids.contains(&e.id))
+                    .cloned()
+                    .collect()
+            };
+
+            if let Some(check) = on_before_delete {
+                let event = crate::types::BeforeDeleteEvent {
+                    nodes: selected_nodes.clone(),
+                    edges: selected_edges.clone(),
+                };
+                if !check(&event) {
+                    delete_latched.set(true);
+                    return;
+                }
+            }
+
+            if let Some(handler) = &on_nodes_delete {
+                handler.call(selected_nodes.clone());
+            }
+            if let Some(handler) = &on_edges_delete {
+                handler.call(selected_edges.clone());
+            }
+
+            let node_changes: Vec<crate::types::NodeChange<N>> = selected_nodes
+                .iter()
+                .map(|n| crate::types::NodeChange::remove(n.id.clone()))
+                .collect();
+            let edge_changes: Vec<crate::types::EdgeChange<E>> = selected_edges
+                .iter()
+                .map(|e| crate::types::EdgeChange::remove(e.id.clone()))
+                .collect();
+
+            if let Some(handler) = &on_nodes_change_delete {
+                handler.call(node_changes);
+            } else {
+                state_delete.apply_node_changes(node_changes);
+            }
+            if let Some(handler) = &on_edges_change_delete {
+                handler.call(edge_changes);
+            } else {
+                state_delete.apply_edge_changes(edge_changes);
+            }
             delete_latched.set(true);
         } else if !pressed && *delete_latched.read() {
             delete_latched.set(false);
         }
     });
 
-    let selection_keys = selection_key_code.unwrap_or_else(|| vec!["Shift".to_string()]);
+    let selection_keys = if disable_keyboard_a11y {
+        Vec::new()
+    } else {
+        selection_key_code.unwrap_or_else(|| vec!["Shift".to_string()])
+    };
     let selection_pressed = crate::hooks::use_key_press_multi(selection_keys);
     let mut state_selection = state.clone();
     use_effect(move || {
+        if disable_keyboard_a11y {
+            state_selection.selection_key_pressed.set(false);
+            return;
+        }
         state_selection
             .selection_key_pressed
             .set(*selection_pressed.read());
     });
 
-    let multi_keys =
-        multi_selection_key_code.unwrap_or_else(|| vec!["Meta".to_string(), "Control".to_string()]);
+    let multi_keys = if disable_keyboard_a11y {
+        Vec::new()
+    } else {
+        multi_selection_key_code
+            .unwrap_or_else(|| vec!["Meta".to_string(), "Control".to_string()])
+    };
     let multi_pressed = crate::hooks::use_key_press_multi(multi_keys);
     let mut state_multi = state.clone();
     use_effect(move || {
+        if disable_keyboard_a11y {
+            state_multi.multi_selection_key_pressed.set(false);
+            return;
+        }
         state_multi
             .multi_selection_key_pressed
             .set(*multi_pressed.read());
     });
 
-    let mut state_keyboard = state.clone();
+    let pan_keys = pan_activation_key_code.unwrap_or_else(|| vec![" ".to_string(), "Space".to_string()]);
+    let pan_pressed = crate::hooks::use_key_press_multi(pan_keys);
+    let mut state_pan_key = state.clone();
+    use_effect(move || {
+        state_pan_key
+            .pan_activation_key_pressed
+            .set(*pan_pressed.read());
+    });
+
+    let zoom_keys = zoom_activation_key_code
+        .unwrap_or_else(|| vec!["Meta".to_string(), "Control".to_string()]);
+    let zoom_pressed = crate::hooks::use_key_press_multi(zoom_keys);
+    let mut state_zoom_key = state.clone();
+    use_effect(move || {
+        state_zoom_key
+            .zoom_activation_key_pressed
+            .set(*zoom_pressed.read());
+    });
+
+    let state_keyboard = state.clone();
     let on_nodes_change_keyboard = on_nodes_change.clone();
     let on_edges_change_keyboard = on_edges_change.clone();
     let _keyboard_listener = use_hook(move || {
@@ -314,6 +704,9 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
         Rc::new(WindowListener::new(
             "keydown",
             move |evt: web_sys::KeyboardEvent| {
+                if disable_keyboard_a11y {
+                    return;
+                }
                 if evt.default_prevented() {
                     return;
                 }
@@ -342,7 +735,7 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
                     "ArrowRight" => dx = step,
                     "Tab" => {
                         evt.prevent_default();
-                        focus_next_node(&mut state_keyboard_event, evt.shift_key());
+                        focus_next_element(&mut state_keyboard_event, evt.shift_key());
                         return;
                     }
                     " " | "Enter" => {
@@ -406,6 +799,12 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
         ))
     });
 
+    let show_attribution =
+        !pro_options.as_ref().map(|p| p.hide_attribution).unwrap_or(false);
+    let attribution_label = aria_label_config
+        .as_ref()
+        .and_then(|config| config.attribution.clone());
+
     rsx! {
         div {
             class: "{flow_class}",
@@ -427,6 +826,23 @@ fn FlowBody<N: Clone + PartialEq + Default + 'static, E: Clone + PartialEq + Def
                 on_move,
                 on_move_start,
                 on_move_end,
+                on_selection_start,
+                on_selection_end,
+                on_node_click,
+                on_node_double_click,
+                on_node_mouse_enter,
+                on_node_mouse_leave,
+                on_edge_click,
+                on_edge_double_click,
+                on_edge_mouse_enter,
+                on_edge_mouse_leave,
+            }
+
+            if show_attribution {
+                crate::components::Attribution {
+                    position: attribution_position,
+                    aria_label: attribution_label,
+                }
             }
 
             {children}
@@ -441,7 +857,12 @@ struct WindowListener {
 
 impl WindowListener {
     fn new(event_type: &str, handler: impl FnMut(web_sys::KeyboardEvent) + 'static) -> Self {
-        let window = web_sys::window().expect("window not available");
+        let Some(window) = web_sys::window() else {
+            return Self {
+                event_type: event_type.to_string(),
+                closure: None,
+            };
+        };
         let closure = Closure::wrap(Box::new(handler) as Box<dyn FnMut(web_sys::KeyboardEvent)>);
         window
             .add_event_listener_with_callback(event_type, closure.as_ref().unchecked_ref())
@@ -524,31 +945,48 @@ fn clamp_keyboard_position<
     }
 }
 
-fn focus_next_node<
+fn focus_next_element<
     N: Clone + PartialEq + Default + 'static,
     E: Clone + PartialEq + Default + 'static,
 >(
     state: &mut FlowState<N, E>,
     reverse: bool,
 ) {
-    if !*state.nodes_focusable.read() {
+    let nodes_enabled = *state.nodes_focusable.read();
+    let edges_enabled = *state.edges_focusable.read();
+    if !nodes_enabled && !edges_enabled {
         return;
     }
-    let focusable: Vec<String> = {
+    let mut focusable: Vec<(bool, String)> = Vec::new();
+    if nodes_enabled {
         let nodes = state.nodes.read();
-        nodes
-            .iter()
-            .filter(|node| !node.hidden && node.focusable.unwrap_or(true))
-            .map(|node| node.id.clone())
-            .collect()
-    };
+        for node in nodes.iter() {
+            if !node.hidden && node.focusable.unwrap_or(true) {
+                focusable.push((true, node.id.clone()));
+            }
+        }
+    }
+    if edges_enabled {
+        let edges = state.edges.read();
+        for edge in edges.iter() {
+            if edge.focusable.unwrap_or(true) {
+                focusable.push((false, edge.id.clone()));
+            }
+        }
+    }
     if focusable.is_empty() {
         return;
     }
-    let current = state.focused_node_id.read().clone();
-    let next_index = current
+    let current_node = state.focused_node_id.read().clone();
+    let current_edge = state.focused_edge_id.read().clone();
+    let next_index = current_node
         .as_ref()
-        .and_then(|id| focusable.iter().position(|v| v == id))
+        .and_then(|id| focusable.iter().position(|(is_node, v)| *is_node && v == id))
+        .or_else(|| {
+            current_edge
+                .as_ref()
+                .and_then(|id| focusable.iter().position(|(is_node, v)| !*is_node && v == id))
+        })
         .map(|index| {
             if reverse {
                 if index == 0 {
@@ -561,16 +999,27 @@ fn focus_next_node<
             }
         })
         .unwrap_or(0);
-    let next_id = focusable[next_index].clone();
-    state.focused_node_id.set(Some(next_id.clone()));
+    let (is_node, next_id) = focusable[next_index].clone();
+    if is_node {
+        state.focused_node_id.set(Some(next_id.clone()));
+        state.focused_edge_id.set(None);
+        if *state.auto_pan_on_node_focus.read() {
+            state.ensure_node_visible(&next_id);
+        }
+    } else {
+        state.focused_edge_id.set(Some(next_id.clone()));
+        state.focused_node_id.set(None);
+    }
 
     if let Some(window) = web_sys::window() {
         if let Some(document) = window.document() {
-            let selector = format!("[data-id=\"{}\"]", next_id.replace('\"', "\\\""));
+            let selector = if is_node {
+                format!("[data-id=\"{}\"]", next_id.replace('\"', "\\\""))
+            } else {
+                format!("[data-edge-id=\"{}\"]", next_id.replace('\"', "\\\""))
+            };
             if let Ok(Some(element)) = document.query_selector(&selector) {
-                if let Some(html) = element.dyn_into::<web_sys::HtmlElement>().ok() {
-                    let _ = html.focus();
-                }
+                focus_dom_element(&element);
             }
         }
     }
@@ -584,53 +1033,105 @@ fn toggle_focused_selection<
     on_nodes_change: &Option<EventHandler<Vec<crate::types::NodeChange<N>>>>,
     on_edges_change: &Option<EventHandler<Vec<crate::types::EdgeChange<E>>>>,
 ) {
-    let Some(focused_id) = state.focused_node_id.read().clone() else {
+    let multi = *state.multi_selection_key_pressed.read();
+    let focused_node_id = state.focused_node_id.read().clone();
+    if let Some(focused_id) = focused_node_id {
+        let nodes = state.nodes.read().clone();
+        let mut changes = Vec::new();
+        for node in nodes.iter() {
+            let should_select = if node.id == focused_id {
+                if multi { !node.selected } else { true }
+            } else if multi {
+                node.selected
+            } else {
+                false
+            };
+            if node.selected != should_select {
+                changes.push(crate::types::NodeChange::Selection {
+                    id: node.id.clone(),
+                    selected: should_select,
+                });
+            }
+        }
+        if !multi {
+            let edges = state.edges.read().clone();
+            let mut edge_changes = Vec::new();
+            for edge in edges.iter() {
+                if edge.selected {
+                    edge_changes.push(crate::types::EdgeChange::Selection {
+                        id: edge.id.clone(),
+                        selected: false,
+                    });
+                }
+            }
+            if let Some(handler) = on_edges_change {
+                handler.call(edge_changes);
+            } else {
+                state.apply_edge_changes(edge_changes);
+            }
+        }
+
+        if let Some(handler) = on_nodes_change {
+            handler.call(changes);
+        } else {
+            state.apply_node_changes(changes);
+        }
+        return;
+    }
+
+    let focused_edge_id = state.focused_edge_id.read().clone();
+    let Some(focused_edge_id) = focused_edge_id else {
         return;
     };
-    let nodes = state.nodes.read().clone();
-    let mut changes = Vec::new();
-    let multi = *state.multi_selection_key_pressed.read();
-    for node in nodes.iter() {
-        let should_select = if node.id == focused_id {
-            if multi {
-                !node.selected
-            } else {
-                true
-            }
+
+    let edges = state.edges.read().clone();
+    let mut edge_changes = Vec::new();
+    for edge in edges.iter() {
+        let should_select = if edge.id == focused_edge_id {
+            if multi { !edge.selected } else { true }
         } else if multi {
-            node.selected
+            edge.selected
         } else {
             false
         };
-        if node.selected != should_select {
-            changes.push(crate::types::NodeChange::Selection {
-                id: node.id.clone(),
+        if edge.selected != should_select {
+            edge_changes.push(crate::types::EdgeChange::Selection {
+                id: edge.id.clone(),
                 selected: should_select,
             });
         }
     }
+
     if !multi {
-        let edges = state.edges.read().clone();
-        let mut edge_changes = Vec::new();
-        for edge in edges.iter() {
-            if edge.selected {
-                edge_changes.push(crate::types::EdgeChange::Selection {
-                    id: edge.id.clone(),
+        let nodes = state.nodes.read().clone();
+        let mut node_changes = Vec::new();
+        for node in nodes.iter() {
+            if node.selected {
+                node_changes.push(crate::types::NodeChange::Selection {
+                    id: node.id.clone(),
                     selected: false,
                 });
             }
         }
-        if let Some(handler) = on_edges_change {
-            handler.call(edge_changes);
+        if let Some(handler) = on_nodes_change {
+            handler.call(node_changes);
         } else {
-            state.apply_edge_changes(edge_changes);
+            state.apply_node_changes(node_changes);
         }
     }
 
-    if let Some(handler) = on_nodes_change {
-        handler.call(changes);
+    if let Some(handler) = on_edges_change {
+        handler.call(edge_changes);
     } else {
-        state.apply_node_changes(changes);
+        state.apply_edge_changes(edge_changes);
+    }
+}
+
+fn focus_dom_element(element: &web_sys::Element) {
+    if let Ok(focus_fn) = Reflect::get(element, &JsValue::from_str("focus")) {
+        if let Some(func) = focus_fn.dyn_ref::<Function>() {
+            let _ = func.call0(element);
+        }
     }
 }
 

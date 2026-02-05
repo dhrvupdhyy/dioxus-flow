@@ -30,7 +30,7 @@ pub fn BaseEdge(
         let padding = label_bg_padding.unwrap_or((6.0, 4.0));
         let bg_width = text_width + padding.0 * 2.0;
         let bg_height = text_height + padding.1 * 2.0;
-        (bg_width, bg_height, padding)
+        (bg_width, bg_height)
     });
 
     rsx! {
@@ -51,7 +51,7 @@ pub fn BaseEdge(
             g {
                 class: "dioxus-flow__edge-label",
                 if label_show_bg.unwrap_or(false) {
-                    if let Some((bg_width, bg_height, padding)) = label_metrics {
+                    if let Some((bg_width, bg_height)) = label_metrics {
                         rect {
                             x: "{x - bg_width / 2.0}",
                             y: "{y - bg_height / 2.0}",

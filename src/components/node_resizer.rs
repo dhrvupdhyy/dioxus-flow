@@ -2,7 +2,7 @@
 
 use dioxus::prelude::dioxus_elements::input_data::MouseButton;
 use dioxus::prelude::*;
-use dioxus::prelude::{try_use_context, PointerInteraction, ReadableExt};
+use dioxus::prelude::{PointerInteraction, ReadableExt, try_use_context};
 
 use crate::state::{FlowState, NodeIdContext};
 use crate::types::{
@@ -44,7 +44,7 @@ pub fn NodeResizer<
     };
 
     let internal = state.node_lookup.read().get(&node_id).cloned();
-    let Some(internal) = internal else {
+    let Some(_internal) = internal else {
         return rsx! {};
     };
 

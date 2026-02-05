@@ -3,7 +3,7 @@
 use crate::state::{FlowState, NodeIdContext};
 use crate::types::{Position, Rect, ToolbarAlign, XYPosition};
 use dioxus::prelude::*;
-use dioxus::prelude::{try_use_context, ReadableExt};
+use dioxus::prelude::{ReadableExt, try_use_context};
 
 #[component]
 pub fn NodeToolbar<
@@ -88,7 +88,6 @@ pub fn NodeToolbar<
 
     rsx! {
         crate::components::EdgeLabelRenderer::<N, E> {
-            no_scale: true,
             div {
                 class: "dioxus-flow__node-toolbar {class}",
                 style: "{combined_style}",

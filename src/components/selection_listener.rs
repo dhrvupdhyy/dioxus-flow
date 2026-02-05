@@ -18,40 +18,70 @@ pub fn SelectionListener<
     let mut last_edges = use_signal(|| Vec::<String>::new());
 
     use_effect(move || {
-        let selected_nodes: Vec<_> = state
+        let node_ids: Vec<String> = state
             .nodes
             .read()
             .iter()
             .filter(|n| n.selected)
-            .cloned()
+            .map(|n| n.id.clone())
             .collect();
-        let selected_edges: Vec<_> = state
+        let edge_ids: Vec<String> = state
             .edges
             .read()
             .iter()
             .filter(|e| e.selected)
-            .cloned()
+            .map(|e| e.id.clone())
             .collect();
 
-        let node_ids: Vec<String> = selected_nodes.iter().map(|n| n.id.clone()).collect();
-        let edge_ids: Vec<String> = selected_edges.iter().map(|e| e.id.clone()).collect();
+        if *last_nodes.read() == node_ids && *last_edges.read() == edge_ids {
+            return;
+        }
 
-        if *last_nodes.read() != node_ids || *last_edges.read() != edge_ids {
-            last_nodes.set(node_ids);
-            last_edges.set(edge_ids);
+        last_nodes.set(node_ids);
+        last_edges.set(edge_ids);
 
-            let change = SelectionChange {
-                nodes: selected_nodes,
-                edges: selected_edges,
-            };
+        let change = SelectionChange {
+            nodes: state
+                .nodes
+                .read()
+                .iter()
+                .filter(|n| n.selected)
+                .cloned()
+                .collect(),
+            edges: state
+                .edges
+                .read()
+                .iter()
+                .filter(|e| e.selected)
+                .cloned()
+                .collect(),
+        };
 
-            if let Some(handler) = &on_selection_change {
-                handler.call(change.clone());
-            }
+        let mut sinks: Vec<EventHandler<SelectionChange<N, E>>> = Vec::new();
+        if let Some(handler) = on_selection_change.clone() {
+            sinks.push(handler);
+        }
+        sinks.extend(
+            state
+                .selection_change_handlers
+                .read()
+                .iter()
+                .map(|(_, handler)| handler.clone()),
+        );
 
-            let handlers = state.selection_change_handlers.read().clone();
-            for (_, handler) in handlers {
-                handler.call(change.clone());
+        if sinks.is_empty() {
+            return;
+        }
+
+        let last = sinks.len() - 1;
+        let mut maybe_change = Some(change);
+        for (index, handler) in sinks.into_iter().enumerate() {
+            if index == last {
+                if let Some(final_change) = maybe_change.take() {
+                    handler.call(final_change);
+                }
+            } else if let Some(current) = maybe_change.as_ref() {
+                handler.call(current.clone());
             }
         }
     });

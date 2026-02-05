@@ -8,8 +8,8 @@ use dioxus::prelude::*;
 use dioxus::prelude::{InteractionLocation, ModifiersInteraction, PointerInteraction, ReadableExt};
 use dioxus_web::WebEventExt;
 use std::collections::HashMap;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::closure::Closure;
 
 #[component]
 pub fn NodeRenderer<
@@ -20,6 +20,10 @@ pub fn NodeRenderer<
     #[props(default)] on_nodes_change: Option<EventHandler<Vec<crate::types::NodeChange<N>>>>,
     #[props(default)] on_edges_change: Option<EventHandler<Vec<crate::types::EdgeChange<E>>>>,
     #[props(default)] on_node_drag_start: Option<EventHandler<crate::types::NodeDragEvent<N>>>,
+    #[props(default)] on_node_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_double_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_enter: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_leave: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
     #[props(default)] _marker: std::marker::PhantomData<E>,
 ) -> Element {
     let state = use_context::<FlowState<N, E>>();
@@ -49,6 +53,10 @@ pub fn NodeRenderer<
                     on_nodes_change: on_nodes_change.clone(),
                     on_edges_change: on_edges_change.clone(),
                     on_node_drag_start: on_node_drag_start.clone(),
+                    on_node_click: on_node_click.clone(),
+                    on_node_double_click: on_node_double_click.clone(),
+                    on_node_mouse_enter: on_node_mouse_enter.clone(),
+                    on_node_mouse_leave: on_node_mouse_leave.clone(),
                 }
             }
         }
@@ -65,20 +73,42 @@ fn NodeWrapper<
     #[props(default)] on_nodes_change: Option<EventHandler<Vec<crate::types::NodeChange<N>>>>,
     #[props(default)] on_edges_change: Option<EventHandler<Vec<crate::types::EdgeChange<E>>>>,
     #[props(default)] on_node_drag_start: Option<EventHandler<crate::types::NodeDragEvent<N>>>,
+    #[props(default)] on_node_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_double_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_enter: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_leave: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
     #[props(default)] _marker: std::marker::PhantomData<E>,
 ) -> Element {
     let _node_id_context = use_context_provider(|| crate::state::NodeIdContext(node.id.clone()));
     let state = use_context::<FlowState<N, E>>();
-    use_context_provider(|| crate::state::NodeIdContext(node.id.clone()));
     let mut resize_observer = use_signal(|| None::<ResizeObserverCleanup>);
 
     let dims = node.get_dimensions();
-    let position = node.position;
+    let position = state
+        .node_lookup
+        .read()
+        .get(&node.id)
+        .map(|internal| internal.position_absolute)
+        .unwrap_or_else(|| {
+            let origin = *state.node_origin.read();
+            XYPosition {
+                x: node.position.x - dims.width * origin.0,
+                y: node.position.y - dims.height * origin.1,
+            }
+        });
     let mut style = format!(
         "transform: translate({}px, {}px); width: {}px; height: {}px;",
         position.x, position.y, dims.width, dims.height
     );
-    if let Some(z_index) = node.z_index {
+    let base_z = node.z_index.unwrap_or(0);
+    let z_mode = *state.z_index_mode.read();
+    let elevate = *state.elevate_nodes_on_select.read();
+    let z_index = if elevate && node.selected && z_mode != crate::types::ZIndexMode::Manual {
+        base_z + 1000
+    } else {
+        base_z
+    };
+    if z_index != 0 {
         style.push_str(&format!(" z-index: {};", z_index));
     }
     if let Some(extra) = &node.style {
@@ -100,6 +130,19 @@ fn NodeWrapper<
         }
         evt.stop_propagation();
 
+        let web_evt = evt.data.as_web_event();
+        if let Some(target) = web_evt
+            .target()
+            .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+        {
+            let no_drag_class = state_down.no_drag_class_name.read().clone();
+            if !no_drag_class.is_empty()
+                && target.closest(&format!(".{}", no_drag_class)).ok().flatten().is_some()
+            {
+                return;
+            }
+        }
+
         if let Some(selector) = &drag_handle_selector {
             let web_evt = evt.data.as_web_event();
             let Some(target) = web_evt
@@ -119,40 +162,47 @@ fn NodeWrapper<
                 || modifiers.shift()
                 || modifiers.meta()
                 || modifiers.ctrl();
-            let nodes = state_down.nodes.read().clone();
-            let mut changes = Vec::new();
+            if *state_down.select_nodes_on_drag.read() {
+                let nodes = state_down.nodes.read().clone();
+                let mut changes = Vec::new();
 
-            if multi {
-                let next = !selected;
-                changes.push(crate::types::NodeChange::Selection {
-                    id: node_id.clone(),
-                    selected: next,
-                });
+                if multi {
+                    let next = !selected;
+                    changes.push(crate::types::NodeChange::Selection {
+                        id: node_id.clone(),
+                        selected: next,
+                    });
+                } else {
+                    for other in nodes.iter() {
+                        let should_select = other.id == node_id;
+                        if other.selected != should_select {
+                            changes.push(crate::types::NodeChange::Selection {
+                                id: other.id.clone(),
+                                selected: should_select,
+                            });
+                        }
+                    }
+
+                    let edges = state_down.edges.read().clone();
+                    let mut edge_changes = Vec::new();
+                    for edge in edges.iter() {
+                        if edge.selected {
+                            edge_changes.push(crate::types::EdgeChange::Selection {
+                                id: edge.id.clone(),
+                                selected: false,
+                            });
+                        }
+                    }
+                    apply_edge_changes(&mut state_down, &on_edges_change, edge_changes);
+                }
+
+                apply_node_changes(&mut state_down, &on_nodes_change, changes);
             } else {
-                for other in nodes.iter() {
-                    let should_select = other.id == node_id;
-                    if other.selected != should_select {
-                        changes.push(crate::types::NodeChange::Selection {
-                            id: other.id.clone(),
-                            selected: should_select,
-                        });
-                    }
-                }
-
-                let edges = state_down.edges.read().clone();
-                let mut edge_changes = Vec::new();
-                for edge in edges.iter() {
-                    if edge.selected {
-                        edge_changes.push(crate::types::EdgeChange::Selection {
-                            id: edge.id.clone(),
-                            selected: false,
-                        });
-                    }
-                }
-                apply_edge_changes(&mut state_down, &on_edges_change, edge_changes);
+                state_down.pending_node_click.set(Some(crate::state::PendingNodeClick {
+                    node_id: node_id.clone(),
+                    multi,
+                }));
             }
-
-            apply_node_changes(&mut state_down, &on_nodes_change, changes);
         }
 
         if !draggable || !*state_down.nodes_draggable.read() {
@@ -174,12 +224,46 @@ fn NodeWrapper<
             origin_node_id: node_id.clone(),
             start_pointer,
             nodes: drag_positions,
+            started: false,
         }));
 
         if let Some(handler) = &on_node_drag_start {
             handler.call(crate::types::NodeDragEvent {
                 node: node_for_drag.clone(),
                 nodes: drag_nodes,
+            });
+        }
+    };
+
+    let node_click = node.clone();
+    let on_click = move |_| {
+        if let Some(handler) = &on_node_click {
+            handler.call(crate::types::NodeMouseEvent {
+                node: node_click.clone(),
+            });
+        }
+    };
+    let node_double_click = node.clone();
+    let on_double_click = move |_| {
+        if let Some(handler) = &on_node_double_click {
+            handler.call(crate::types::NodeMouseEvent {
+                node: node_double_click.clone(),
+            });
+        }
+    };
+    let node_enter = node.clone();
+    let on_mouse_enter = move |_| {
+        if let Some(handler) = &on_node_mouse_enter {
+            handler.call(crate::types::NodeMouseEvent {
+                node: node_enter.clone(),
+            });
+        }
+    };
+    let node_leave = node.clone();
+    let on_mouse_leave = move |_| {
+        if let Some(handler) = &on_node_mouse_leave {
+            handler.call(crate::types::NodeMouseEvent {
+                node: node_leave.clone(),
             });
         }
     };
@@ -210,20 +294,28 @@ fn NodeWrapper<
         }
     };
 
-    let base_class = if selected {
-        "dioxus-flow__node selected"
-    } else {
-        "dioxus-flow__node"
-    };
+    let mut base_class = String::from("dioxus-flow__node");
+    if selectable {
+        base_class.push_str(" selectable");
+    }
+    if draggable {
+        base_class.push_str(" draggable");
+    }
+    if selected {
+        base_class.push_str(" selected");
+    }
     let class = if let Some(extra) = &node.class_name {
         format!("{} {}", base_class, extra)
     } else {
         base_class.to_string()
     };
 
-    let aria_label = node.aria_label.clone().unwrap_or_default();
+    let aria_config = state.aria_label_config.read().clone();
+    let aria_label = node.aria_label.clone().or(aria_config.node).unwrap_or_else(|| {
+        format!("Node {}", node.id)
+    });
 
-    let tab_index = if node.focusable.unwrap_or(true) {
+    let tab_index = if *state.nodes_focusable.read() && node.focusable.unwrap_or(true) {
         "0"
     } else {
         "-1"
@@ -234,7 +326,7 @@ fn NodeWrapper<
             class: "{class}",
             style: "{style}",
             "data-id": "{node.id}",
-            aria_label: "{aria_label}",
+            "aria-label": "{aria_label}",
             role: "group",
             tabindex: "{tab_index}",
             onfocus: {
@@ -242,6 +334,7 @@ fn NodeWrapper<
                 let node_id = node.id.clone();
                 move |_| {
                     state_focus.focused_node_id.set(Some(node_id.clone()));
+                    state_focus.focused_edge_id.set(None);
                 }
             },
             onblur: {
@@ -254,6 +347,10 @@ fn NodeWrapper<
                 }
             },
             onpointerdown: on_pointer_down,
+            onclick: on_click,
+            ondoubleclick: on_double_click,
+            onmouseenter: on_mouse_enter,
+            onmouseleave: on_mouse_leave,
             onmounted: move |evt| {
                 if resize_observer.read().is_some() {
                     return;
@@ -265,7 +362,8 @@ fn NodeWrapper<
                 let handler = on_nodes_change.clone();
                 let node_id_for_bounds = node.id.clone();
 
-                if let Some(bounds) = compute_handle_bounds(&element) {
+                let zoom = state_resize.viewport.read().zoom.max(0.0001);
+                if let Some(bounds) = compute_handle_bounds(&element, zoom) {
                     state_resize.update_handle_bounds(&node_id_for_bounds, bounds);
                 }
 
@@ -287,7 +385,8 @@ fn NodeWrapper<
                         };
                         apply_node_changes(&mut state_resize, &handler, vec![change]);
 
-                        if let Some(bounds) = compute_handle_bounds(&element_for_cb) {
+                        let zoom = state_resize.viewport.read().zoom.max(0.0001);
+                        if let Some(bounds) = compute_handle_bounds(&element_for_cb, zoom) {
                             state_resize.update_handle_bounds(&node_id_for_bounds, bounds);
                         }
                     },
@@ -318,7 +417,7 @@ impl Drop for ResizeObserverCleanup {
     }
 }
 
-fn compute_handle_bounds(element: &web_sys::Element) -> Option<HandleBounds> {
+fn compute_handle_bounds(element: &web_sys::Element, zoom: f64) -> Option<HandleBounds> {
     let node_rect = element.get_bounding_client_rect();
     let handles = element.query_selector_all(".dioxus-flow__handle").ok()?;
     let mut bounds = HandleBounds::default();
@@ -328,10 +427,10 @@ fn compute_handle_bounds(element: &web_sys::Element) -> Option<HandleBounds> {
             .get(index)
             .and_then(|h| h.dyn_into::<web_sys::Element>().ok())?;
         let rect = handle.get_bounding_client_rect();
-        let x = rect.x() - node_rect.x();
-        let y = rect.y() - node_rect.y();
-        let width = rect.width();
-        let height = rect.height();
+        let x = (rect.x() - node_rect.x()) / zoom;
+        let y = (rect.y() - node_rect.y()) / zoom;
+        let width = rect.width() / zoom;
+        let height = rect.height() / zoom;
         let id = handle
             .get_attribute("data-handle-id")
             .filter(|v| !v.is_empty());

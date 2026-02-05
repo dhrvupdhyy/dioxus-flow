@@ -9,6 +9,7 @@ use crate::utils::{
 use dioxus::prelude::ReadableExt;
 use dioxus::prelude::*;
 use std::collections::HashMap;
+use wasm_bindgen::JsCast;
 
 #[component]
 pub fn GraphView<
@@ -36,6 +37,18 @@ pub fn GraphView<
     #[props(default)] on_move: Option<EventHandler<crate::types::Viewport>>,
     #[props(default)] on_move_start: Option<EventHandler<crate::types::Viewport>>,
     #[props(default)] on_move_end: Option<EventHandler<crate::types::Viewport>>,
+    #[props(default)] on_selection_start: Option<EventHandler<crate::types::SelectionStartEvent>>,
+    #[props(default)] on_selection_end: Option<
+        EventHandler<crate::types::SelectionEndEvent<N, E>>,
+    >,
+    #[props(default)] on_node_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_double_click: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_enter: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_node_mouse_leave: Option<EventHandler<crate::types::NodeMouseEvent<N>>>,
+    #[props(default)] on_edge_click: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_double_click: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_mouse_enter: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
+    #[props(default)] on_edge_mouse_leave: Option<EventHandler<crate::types::EdgeMouseEvent<E>>>,
 ) -> Element {
     let state = use_context::<FlowState<N, E>>();
 
@@ -44,6 +57,48 @@ pub fn GraphView<
         "transform: translate({}px, {}px) scale({});",
         viewport.x, viewport.y, viewport.zoom
     );
+
+    let mut last_zoom = use_signal(|| viewport.zoom);
+    let mut last_handle_bounds_zoom = use_signal(|| viewport.zoom);
+    let mut state_zoom = state.clone();
+    use_effect(move || {
+        let zoom = state_zoom.viewport.read().zoom;
+        if (zoom - *last_zoom.read()).abs() < 0.0001 {
+            return;
+        }
+        last_zoom.set(zoom);
+        let connecting = state_zoom.connection.read().in_progress;
+        if !connecting {
+            return;
+        }
+        if (zoom - *last_handle_bounds_zoom.read()).abs() < 0.02 {
+            return;
+        }
+        last_handle_bounds_zoom.set(zoom);
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let Some(document) = window.document() else {
+            return;
+        };
+        let Ok(node_elements) = document.query_selector_all(".dioxus-flow__node") else {
+            return;
+        };
+        for idx in 0..node_elements.length() {
+            let Some(element) = node_elements
+                .get(idx)
+                .and_then(|el| el.dyn_into::<web_sys::Element>().ok())
+            else {
+                continue;
+            };
+            let Some(node_id) = element.get_attribute("data-id") else {
+                continue;
+            };
+            if let Some(bounds) = compute_handle_bounds_for_zoom(&element, zoom.max(0.0001)) {
+                state_zoom.update_handle_bounds(&node_id, bounds);
+            }
+        }
+    });
 
     let selection = state.user_selection_rect.read().clone();
     let selection_style = selection.as_ref().map(|rect| {
@@ -62,6 +117,8 @@ pub fn GraphView<
             on_move,
             on_move_start,
             on_move_end,
+            on_selection_start,
+            on_selection_end,
             on_nodes_change,
             on_edges_change,
             on_connect,
@@ -82,14 +139,24 @@ pub fn GraphView<
                     on_edges_change,
                     on_connect,
                     on_edge_update_start,
+                    on_edge_click,
+                    on_edge_double_click,
+                    on_edge_mouse_enter,
+                    on_edge_mouse_leave,
                 }
+                div { class: "dioxus-flow__edgelabel-renderer" }
 
                 NodeRenderer::<N, E> {
                     node_types,
                     on_nodes_change,
                     on_edges_change,
                     on_node_drag_start,
+                    on_node_click,
+                    on_node_double_click,
+                    on_node_mouse_enter,
+                    on_node_mouse_leave,
                 }
+                div { class: "dioxus-flow__viewport-portal" }
             }
 
             if state.user_selection_active.read().clone() {
@@ -193,13 +260,13 @@ fn connection_line_element<
             get_step_path(from_x, from_y, to.x, to.y, from_pos, to_position, None).path
         }
         crate::types::ConnectionLineType::SmoothStep => {
-            get_smooth_step_path(from_x, from_y, to.x, to.y, from_pos, to_position, None).path
+            get_smooth_step_path(from_x, from_y, to.x, to.y, from_pos, to_position, None, None, None).path
         }
         crate::types::ConnectionLineType::SimpleBezier => {
-            get_simple_bezier_path(from_x, from_y, to.x, to.y).path
+            get_simple_bezier_path(from_x, from_y, to.x, to.y, from_pos, to_position).path
         }
         crate::types::ConnectionLineType::Bezier => {
-            get_bezier_path(from_x, from_y, to.x, to.y, from_pos, from_pos, None).path
+            get_bezier_path(from_x, from_y, to.x, to.y, from_pos, to_position, None).path
         }
     };
 
@@ -269,4 +336,59 @@ fn select_handle<'a>(
         }
     }
     handles.first()
+}
+
+fn compute_handle_bounds_for_zoom(element: &web_sys::Element, zoom: f64) -> Option<HandleBounds> {
+    let node_rect = element.get_bounding_client_rect();
+    let handles = element.query_selector_all(".dioxus-flow__handle").ok()?;
+    let mut bounds = HandleBounds::default();
+
+    for index in 0..handles.length() {
+        let handle = handles
+            .get(index)
+            .and_then(|h| h.dyn_into::<web_sys::Element>().ok())?;
+        let rect = handle.get_bounding_client_rect();
+        let x = (rect.x() - node_rect.x()) / zoom;
+        let y = (rect.y() - node_rect.y()) / zoom;
+        let width = rect.width() / zoom;
+        let height = rect.height() / zoom;
+        let id = handle
+            .get_attribute("data-handle-id")
+            .filter(|v| !v.is_empty());
+        let class_name = handle.get_attribute("class").unwrap_or_default();
+
+        let position = if class_name.contains("dioxus-flow__handle-left") {
+            Position::Left
+        } else if class_name.contains("dioxus-flow__handle-right") {
+            Position::Right
+        } else if class_name.contains("dioxus-flow__handle-top") {
+            Position::Top
+        } else {
+            Position::Bottom
+        };
+
+        let handle_type = if class_name.contains("dioxus-flow__handle-target") {
+            HandleType::Target
+        } else {
+            HandleType::Source
+        };
+
+        let is_connectable = class_name.contains("connectable");
+        let bound = HandleBound {
+            id,
+            position,
+            x,
+            y,
+            width,
+            height,
+            is_connectable,
+        };
+
+        match handle_type {
+            HandleType::Source => bounds.source.push(bound),
+            HandleType::Target => bounds.target.push(bound),
+        }
+    }
+
+    Some(bounds)
 }
