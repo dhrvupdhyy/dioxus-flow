@@ -321,6 +321,29 @@ fn NodeWrapper<
         "-1"
     };
 
+    // Handle sets can change without resize (e.g., toggling top/bottom handles in custom nodes).
+    // Refresh bounds after render so edge anchors use current handle geometry.
+    {
+        let node_id = node.id.clone();
+        let mut state_bounds = state.clone();
+        use_effect(move || {
+            let Some(window) = web_sys::window() else {
+                return;
+            };
+            let Some(document) = window.document() else {
+                return;
+            };
+            let selector = format!("[data-id=\"{}\"]", node_id.replace('\"', "\\\""));
+            let Ok(Some(element)) = document.query_selector(&selector) else {
+                return;
+            };
+            let zoom = state_bounds.viewport.read().zoom.max(0.0001);
+            if let Some(bounds) = compute_handle_bounds(&element, zoom) {
+                state_bounds.update_handle_bounds(&node_id, bounds);
+            }
+        });
+    }
+
     rsx! {
         div {
             class: "{class}",

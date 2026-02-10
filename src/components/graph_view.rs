@@ -219,9 +219,9 @@ fn connection_line_element<
                         .map(|handle| handle.position)
                 })
             })
-            .unwrap_or(from_pos)
+            .unwrap_or_else(|| infer_connection_target_position(from_x, from_y, to.x, to.y))
     } else {
-        from_pos
+        infer_connection_target_position(from_x, from_y, to.x, to.y)
     };
     let is_valid = connection.is_valid;
     let status_class = if is_valid {
@@ -281,6 +281,23 @@ fn connection_line_element<
                 d: "{path}",
             }
         }
+    }
+}
+
+fn infer_connection_target_position(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> Position {
+    let dx = to_x - from_x;
+    let dy = to_y - from_y;
+
+    if dx.abs() >= dy.abs() {
+        if dx >= 0.0 {
+            Position::Left
+        } else {
+            Position::Right
+        }
+    } else if dy >= 0.0 {
+        Position::Top
+    } else {
+        Position::Bottom
     }
 }
 

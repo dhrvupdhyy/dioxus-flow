@@ -60,20 +60,20 @@ pub fn EdgeRenderer<
                 let source_node = nodes.get(&edge.source)?;
                 let target_node = nodes.get(&edge.target)?;
 
-                let source_pos = source_node.node.source_position.unwrap_or(Position::Right);
-                let target_pos = target_node.node.target_position.unwrap_or(Position::Left);
+                let source_fallback_pos = source_node.node.source_position.unwrap_or(Position::Right);
+                let target_fallback_pos = target_node.node.target_position.unwrap_or(Position::Left);
 
-                let (source_x, source_y) = handle_position_for_edge(
+                let (source_x, source_y, source_pos) = handle_position_for_edge(
                     &source_node,
                     HandleType::Source,
                     edge.source_handle.as_deref(),
-                    source_pos,
+                    source_fallback_pos,
                 );
-                let (target_x, target_y) = handle_position_for_edge(
+                let (target_x, target_y, target_pos) = handle_position_for_edge(
                     &target_node,
                     HandleType::Target,
                     edge.target_handle.as_deref(),
-                    target_pos,
+                    target_fallback_pos,
                 );
 
                 Some(EdgeRender {
@@ -637,17 +637,19 @@ fn handle_position_for_edge<N: Clone + PartialEq + Default>(
     handle_type: HandleType,
     handle_id: Option<&str>,
     fallback_position: Position,
-) -> (f64, f64) {
+) -> (f64, f64, Position) {
     if let Some(bounds) = &node.handle_bounds {
         if let Some(handle) = select_handle(bounds, handle_type, handle_id) {
             return (
                 node.position_absolute.x + handle.x + handle.width / 2.0,
                 node.position_absolute.y + handle.y + handle.height / 2.0,
+                handle.position,
             );
         }
     }
 
-    node_handle_position_internal(node, fallback_position)
+    let (x, y) = node_handle_position_internal(node, fallback_position);
+    (x, y, fallback_position)
 }
 
 fn select_handle<'a>(
